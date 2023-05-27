@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.lint.json",
+  "compilerOptions": {
+    "target": "ES6",
+    "outDir": "./build/dist/esm",
+    "rootDir": "src",
+    "noEmit": false
+  },
+  "include": ["./src/**/*.ts", "src/util.ts"]
+}

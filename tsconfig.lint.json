@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "rootDir": "src",
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "declarationDir": "./build/dist/types"
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

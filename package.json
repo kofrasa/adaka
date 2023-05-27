@@ -1,0 +1,73 @@
+{
+  "name": "adaka",
+  "version": "0.0.1",
+  "description": "High-precision state management using MongoDB query language.",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "scripts": {
+    "prepare": "husky install",
+    "docs": "typedoc --entryPointStrategy expand src/ && touch docs/.nojekyll",
+    "compile": "tsc && tsc --build tsconfig.cjs.json",
+    "build": "npm run clean && npm run compile && node ./build.js",
+    "clean": "rm -fr build",
+    "test": "jest",
+    "release": "npm run test && npm run build && cd build && npm publish",
+    "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
+    "prepublishOnly": "echo \"use 'npm run release'\" && false",
+    "postinstall": "node ./build.js install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kofrasa/adaka.git"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "mingo": "^6.3.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.2.5",
+    "@types/node": "^18.11.18",
+    "@typescript-eslint/eslint-plugin": "5.54.0",
+    "@typescript-eslint/parser": "^5.48.0",
+    "eslint": "8.40.0",
+    "eslint-config-prettier": "8.8.0",
+    "eslint-plugin-import": "2.27.5",
+    "eslint-plugin-prettier": "4.2.1",
+    "eslint-plugin-simple-import-sort": "10.0.0",
+    "eslint-plugin-unused-imports": "2.0.0",
+    "glob": "^10.2.6",
+    "husky": "^8.0.3",
+    "jest": "^29.3.1",
+    "lint-staged": "^13.2.2",
+    "perf_hooks": "^0.0.1",
+    "prettier": "^2.8.1",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.1",
+    "typedoc": "^0.24.7",
+    "typescript": "^5.0.4",
+    "mingo": "^6.3.4"
+  },
+  "keywords": [
+    "state",
+    "query",
+    "project",
+    "immutable",
+    "observable"
+  ],
+  "author": {
+    "name": "Francis Asante",
+    "email": "kofrasa@gmail.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kofrasa/adaka/issues"
+  },
+  "lint-staged": {
+    "*.ts": "eslint --cache --fix"
+  }
+}
