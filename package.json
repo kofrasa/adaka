@@ -13,7 +13,6 @@
     "clean": "rm -fr build",
     "test": "jest",
     "release": "npm run test && npm run build && cd build && npm publish",
-    "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
     "prepublishOnly": "echo \"use 'npm run release'\" && false",
     "postinstall": "node ./build.js install"
   },
@@ -49,8 +48,7 @@
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.1",
     "typedoc": "^0.24.7",
-    "typescript": "^5.0.4",
-    "nyc": "15.1.0"
+    "typescript": "^5.0.4"
   },
   "keywords": [
     "state",
