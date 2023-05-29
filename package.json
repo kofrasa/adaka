@@ -50,7 +50,7 @@
     "ts-node": "^10.9.1",
     "typedoc": "^0.24.7",
     "typescript": "^5.0.4",
-    "mingo": "^6.3.4"
+    "nyc": "15.1.0"
   },
   "keywords": [
     "state",
