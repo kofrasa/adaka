@@ -44,7 +44,7 @@ export function createStore<T extends RawObject>(
 export class Store<T extends RawObject> {
   // internal reference to state object
   private readonly state: T;
-  // ordered set of selectors
+  // ordered set of selectors. only selectors with subscribers are kept here.
   private readonly selectors = new Set<Selector<RawObject>>();
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
@@ -57,6 +57,15 @@ export class Store<T extends RawObject> {
   constructor(initialState: T, options?: { queryOptions: Options }) {
     this.state = cloneDeep(initialState) as T;
     this.queryOptions = initOptions(options?.queryOptions);
+  }
+
+  /** A callback to ensure only selectors with subscribers are notified.  */
+  private emit(s: Selector<RawObject>, subs: number) {
+    if (subs === 0) {
+      this.selectors.delete(s);
+    } else if (this.signals.has(s)) {
+      this.selectors.add(s);
+    }
   }
 
   /**
@@ -79,7 +88,8 @@ export class Store<T extends RawObject> {
       this.state,
       projection,
       new Query(condition, this.queryOptions),
-      this.queryOptions
+      this.queryOptions,
+      (s: Selector<P>, n: number) => this.emit(s as Selector<RawObject>, n)
     );
     const pred = sameAncestor.bind(null, expected) as Predicate<AnyVal>;
     // function to detect changes and notify observers
@@ -89,7 +99,6 @@ export class Store<T extends RawObject> {
       // notify listeners only when change is detected
       if (usize < tsize || changed.some(pred)) selector.notifyAll();
     };
-    this.selectors.add(selector as Selector<RawObject>);
     this.signals.set(selector as Selector<RawObject>, signal);
     return selector;
   }
@@ -142,8 +151,16 @@ export class Selector<T extends RawObject> {
     private readonly state: RawObject,
     private readonly projection: Record<keyof T, AnyVal>,
     private readonly query: Query,
-    private readonly options: Options
+    private readonly options: Options,
+    private readonly emit: (s: Selector<T>, n: number) => void
   ) {}
+
+  private doEmit() {
+    const size = this.listeners.size;
+    if (size === 1 || size === 0) {
+      this.emit(this, this.listeners.size);
+    }
+  }
 
   /** Checks whether conditions on this selector are fulfilled. */
   private available() {
@@ -184,6 +201,7 @@ export class Selector<T extends RawObject> {
           }
         }
       }
+      this.doEmit();
       /*eslint-disable-enable*/
     }
   }
@@ -194,6 +212,7 @@ export class Selector<T extends RawObject> {
   removeAll() {
     this.listeners.clear();
     this.onceOnly.clear();
+    this.doEmit();
   }
 
   /**
@@ -207,8 +226,14 @@ export class Selector<T extends RawObject> {
     if (this.onceOnly.has(listener)) {
       throw new Error(`Already subscribed to listen once.`);
     }
-    if (!this.listeners.has(listener)) this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    if (!this.listeners.has(listener)) {
+      this.listeners.add(listener);
+      this.doEmit();
+    }
+    return () => {
+      this.listeners.delete(listener);
+      this.doEmit();
+    };
   }
 
   /**
@@ -245,10 +270,12 @@ export class Selector<T extends RawObject> {
     if (!this.onceOnly.has(listener)) {
       this.listeners.add(listener);
       this.onceOnly.add(listener);
+      this.doEmit();
     }
     return () => {
       this.listeners.delete(listener);
       this.onceOnly.delete(listener);
+      this.doEmit();
     };
   }
 }
