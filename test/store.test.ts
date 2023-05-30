@@ -10,6 +10,10 @@ useOperators(OperatorType.EXPRESSION, {
   $concat
 } as OperatorMap);
 
+const noop = () => {
+  return;
+};
+
 describe("store", () => {
   type Person = {
     firstName: string;
@@ -233,6 +237,7 @@ describe("store", () => {
             age: { $gte: 30 }
           }
         );
+        selector.listen(noop);
         expect(selector.get()).toEqual({ children: ["Bediako"] });
 
         store.update({ $set: { age: 25 } });

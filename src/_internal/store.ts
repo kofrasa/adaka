@@ -81,8 +81,11 @@ export class Store<T extends RawObject> {
     // ensure not modifiable. some guards for sanity
     condition = cloneFrozen(condition);
     projection = cloneFrozen(projection);
-    // get expected paths to monitor for changes.
-    const expected = cloneFrozen(Array.from(extractKeyPaths(projection)));
+    // get expected paths to monitor for changes. use fields in both projection and condition
+    const [cond, proj] = [condition, projection].map(o =>
+      Array.from(extractKeyPaths(o))
+    );
+    const expected = cloneFrozen(Array.from(new Set(cond.concat(proj))));
     // create and add a new selector
     const selector = new Selector<P>(
       this.state,
@@ -139,6 +142,10 @@ export class Selector<T extends RawObject> {
   private readonly listeners = new Set<Listener<T>>();
   // listeners to be run once only also included in the main listener set.
   private readonly onceOnly = new Set<Listener<T>>();
+  // the last value computed for this selector.
+  private value: T | undefined;
+  // flag used to control when to use cached value.
+  private cached = false;
 
   /**
    * Construct a new selector
@@ -162,21 +169,22 @@ export class Selector<T extends RawObject> {
     }
   }
 
-  /** Checks whether conditions on this selector are fulfilled. */
-  private available() {
-    return this.query.test(this.state);
-  }
-
   /**
    * Return the current value from state if the condition is fulfilled.
+   * The returned value is cached for subsequent calls until notifyAll() is called.
    * @returns {T | undefined}
    */
   get(): T | undefined {
-    if (!this.available()) return;
-    // project fields and freeze final value
-    return $project(Lazy([this.state]), this.projection, this.options)
-      .map(cloneFrozen)
-      .next().value as T;
+    if (this.cached) return this.value;
+    // update cached status
+    this.cached = true;
+    // project fields and freeze final value if query passes
+    const exists = this.query.test(this.state);
+    return (this.value = exists
+      ? ($project(Lazy([this.state]), this.projection, this.options)
+          .map(cloneFrozen)
+          .next().value as T)
+      : undefined);
   }
 
   /**
@@ -186,6 +194,8 @@ export class Selector<T extends RawObject> {
    * If a listener throws an exception when notified, it is removed and does not receive future notifications.
    */
   notifyAll(): void {
+    // clear cache when notifyAll() is called.
+    this.cached = false;
     const val = this.get();
     if (val !== undefined) {
       /*eslint-disable*/
