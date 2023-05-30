@@ -5,7 +5,7 @@ import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
 import { Query } from "mingo/query";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
-import { assert, cloneDeep, has } from "mingo/util";
+import { assert, cloneDeep, has, stringify } from "mingo/util";
 
 import * as UPDATE_OPERATORS from "./operators";
 import { Listener, UpdateOperator } from "./types";
@@ -46,6 +46,7 @@ export class Store<T extends RawObject> {
   private readonly state: T;
   // ordered set of selectors. only selectors with subscribers are kept here.
   private readonly selectors = new Set<Selector<RawObject>>();
+  private readonly hashIndex = new Map<string, Selector<RawObject>>();
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
     Selector<RawObject>,
@@ -81,6 +82,13 @@ export class Store<T extends RawObject> {
     // ensure not modifiable. some guards for sanity
     condition = cloneFrozen(condition);
     projection = cloneFrozen(projection);
+
+    // reuse selectors
+    const hash = stringify({ c: condition, p: projection });
+    if (this.hashIndex.has(hash)) {
+      return this.hashIndex.get(hash) as Selector<P>;
+    }
+
     // get expected paths to monitor for changes. use fields in both projection and condition
     const [cond, proj] = [condition, projection].map(o =>
       Array.from(extractKeyPaths(o))
@@ -103,6 +111,7 @@ export class Store<T extends RawObject> {
       if (usize < tsize || changed.some(pred)) selector.notifyAll();
     };
     this.signals.set(selector as Selector<RawObject>, signal);
+    this.hashIndex.set(hash, selector as Selector<RawObject>);
     return selector;
   }
 

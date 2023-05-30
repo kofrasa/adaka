@@ -24,6 +24,7 @@ High-precision state management using MongoDB query language.
 - Restrict state notifications with conditions expressed as MongoDB queries.
 - Automatically unsubscribes a listener if it throws an exception.
 - Performs value equality using deep equal.
+- React integration via `createSelectorHook`.
 
 ## Usage
 
@@ -89,6 +90,33 @@ selector.get() // {}
 store.update({ $push: { children: "Adrian"} })
 
 selector.get() // { secondChild: 'Adrian' }
+```
+
+### React Integration
+React `>=18.0.0` is required to use this integration. The library expects it as a peer dependency.
+
+```jsx
+import { createStore } from "adaka";
+import { createSelectorHook } from "adaka/react"
+
+// first create your store
+const store = createStore({
+  status: "error",
+  errors: [
+    { type:"api", message: "unknown error" }
+  ],
+});
+
+// create a selector hook some where in global scope. need one per store.
+const useSelector = createSelectorHook(store)
+
+// use the hook inside your React component.
+function ShowErrorTypes() {
+  // select the types of errors only when the status is in "error".
+  const { errorTypes } = useSelector({ errorTypes: "$errors.type" }, { status: "error"})
+
+  return errorTypes ? <div>Issues found: {errorTypes.join("\n")} </div> : <div/>
+}
 ```
 
 ## MongoDB Query Support
