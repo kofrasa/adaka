@@ -57,7 +57,10 @@ export class Store<T extends RawObject> {
 
   constructor(initialState: T, options?: { queryOptions: Options }) {
     this.state = cloneDeep(initialState) as T;
-    this.queryOptions = initOptions(options?.queryOptions);
+    this.queryOptions = initOptions({
+      ...options?.queryOptions,
+      useStrictMode: false // force normal JavaScript semantics.
+    });
   }
 
   /** A callback to ensure only selectors with subscribers are notified.  */
