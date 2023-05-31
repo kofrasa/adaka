@@ -18,7 +18,7 @@ High-precision state management using MongoDB query language.
 - Manage state as a single document modifiable only through the store API.
 - Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language. Supported operators include;
   - Field Update Operators; `$currentDate`, `$inc`, `$max`, `$min`, `$mul`, `$set`, `$unset`.
-  - Array Update Operators; `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
+  - Array Update Operators; `$[]`, `$[<identifier>]`, `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
 - Create selectors to observe a view of the state with full access to query language for reshaping data.
 - Listen for changes in state view in order to react to updates.
 - Restrict state notifications with conditions expressed as MongoDB queries.

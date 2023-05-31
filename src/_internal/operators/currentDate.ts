@@ -1,24 +1,28 @@
-import { ArrayOrObject, Callback, RawObject } from "mingo/types";
-import { walk } from "mingo/util";
+import { ArrayOrObject, RawObject } from "mingo/types";
 
 import { UpdateOptions } from "../types";
+import { applyUpdate, walkExpression } from "../util";
 
 /** Sets the value of a field to the current date. */
 export const $currentDate = (
   obj: RawObject,
   expr: Record<string, true>,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => {
   const now = Date.now();
-  for (const selector of Object.keys(expr)) {
-    walk(
+  walkExpression(expr, arrayFilters, (_, node, queries) => {
+    let changed = false;
+    applyUpdate(
       obj,
-      selector,
-      ((o: ArrayOrObject, k: string) => {
+      node,
+      queries,
+      (o: ArrayOrObject, k: string | number) => {
         o[k] = now;
-        options.emit(selector);
-      }) as Callback,
+        changed = true;
+      },
       { buildGraph: true }
     );
-  }
+    if (changed) options.emit(node.parent);
+  });
 };

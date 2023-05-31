@@ -1,10 +1,4 @@
-import {
-  AnyVal,
-  ArrayOrObject,
-  Callback,
-  RawArray,
-  RawObject
-} from "mingo/types";
+import { AnyVal, ArrayOrObject, RawArray, RawObject } from "mingo/types";
 import {
   cloneDeep,
   compare,
@@ -12,11 +6,11 @@ import {
   isEqual,
   isNumber,
   isObject,
-  resolve,
-  walk
+  resolve
 } from "mingo/util";
 
 import { UpdateOptions } from "../types";
+import { Action, applyUpdate, walkExpression } from "../util";
 
 const OPERATOR_MODIFIERS = Object.freeze([
   "$each",
@@ -29,9 +23,10 @@ const OPERATOR_MODIFIERS = Object.freeze([
 export const $push = (
   obj: RawObject,
   expr: RawObject,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => {
-  for (const [selector, val] of Object.entries(expr)) {
+  walkExpression(expr, arrayFilters, ((val, node, queries) => {
     const args: {
       $each: RawArray;
       $slice?: number;
@@ -48,10 +43,13 @@ export const $push = (
       Object.assign(args, val);
     }
 
-    walk(
+    let changed = false;
+
+    applyUpdate(
       obj,
-      selector,
-      ((o: ArrayOrObject, k: string) => {
+      node,
+      queries,
+      (o: ArrayOrObject, k: string) => {
         const arr = o[k] as RawArray;
         // take a copy of sufficient length.
         const prev = arr.slice(0, args.$slice || arr.length);
@@ -81,11 +79,10 @@ export const $push = (
         }
 
         // detect change
-        if (oldsize != arr.length || !isEqual(prev, arr)) {
-          options.emit(selector);
-        }
-      }) as Callback,
+        if (oldsize != arr.length || !isEqual(prev, arr)) changed = true;
+      },
       { descendArray: true }
     );
-  }
+    if (changed) options.emit(node.parent);
+  }) as Action<number>);
 };

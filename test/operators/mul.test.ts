@@ -10,6 +10,7 @@ describe("operators/mul", () => {
         price: 1.25,
         quantity: 2
       },
+      [],
       UPDATE_OPTIONS
     );
     expect(state).toEqual({
@@ -27,6 +28,7 @@ describe("operators/mul", () => {
       {
         price: 100
       },
+      [],
       UPDATE_OPTIONS
     );
 

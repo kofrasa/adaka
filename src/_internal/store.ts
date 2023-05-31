@@ -122,7 +122,7 @@ export class Store<T extends RawObject> {
    * Dispatches an update expression to mutate the state. Triggers a notification to relevant selectors only.
    * @param expr A MongoDB update expression.
    */
-  update(expr: UpdateExpression): void {
+  update(expr: UpdateExpression, arrayFilters: RawObject[] = []): void {
     // vaidate operator
     const e = Object.entries(expr);
     // check for single entry
@@ -132,11 +132,12 @@ export class Store<T extends RawObject> {
     assert(has(UPDATE_OPERATORS, op), `Operator '${op}' is not supported.`);
     const mutate = UPDATE_OPERATORS[op] as UpdateOperator;
     // setup change tracker
-    const changed = new Array<string>();
-    const emit = (selector: string) => changed.push(selector);
+    const set = new Set<string>();
+    const emit = (selector: string) => set.add(selector);
     // apply updates
-    mutate(this.state, args, { emit });
+    mutate(this.state, args, arrayFilters, { emit });
     // notify subscribers
+    const changed = Array.from(set);
     this.selectors.forEach(o => {
       const cb = this.signals.get(o);
       if (cb) cb(changed);

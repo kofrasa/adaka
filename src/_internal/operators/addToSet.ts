@@ -1,33 +1,30 @@
-import { ArrayOrObject, Callback, RawArray, RawObject } from "mingo/types";
-import {
-  cloneDeep,
-  has,
-  intersection,
-  isObject,
-  unique,
-  walk
-} from "mingo/util";
+import { ArrayOrObject, RawArray, RawObject } from "mingo/types";
+import { cloneDeep, has, intersection, isObject, unique } from "mingo/util";
 
 import { UpdateOptions } from "../types";
+import { Action, applyUpdate, walkExpression } from "../util";
 
 /** Adds a value to an array unless the value is already present. */
 export const $addToSet = (
   obj: RawObject,
   expr: RawObject,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => {
-  for (const [selector, val] of Object.entries(expr)) {
+  walkExpression(expr, arrayFilters, ((val, node, queries) => {
     const args = { $each: [val] };
     if (isObject(val) && has(val as RawObject, "$each")) {
       Object.assign(args, val);
     }
-    walk(obj, selector, ((o: ArrayOrObject, k: string | number) => {
+    let changed = false;
+    applyUpdate(obj, node, queries, (o: ArrayOrObject, k: string) => {
       const prev = o[k] as RawArray;
       const common = intersection([prev, args.$each]);
       if (common.length !== args.$each.length) {
         o[k] = cloneDeep(unique(prev.concat(args.$each)));
-        options.emit(selector);
+        changed = true;
       }
-    }) as Callback);
-  }
+    });
+    if (changed) options.emit(node.parent);
+  }) as Action);
 };

@@ -1,5 +1,12 @@
-import { AnyVal, ArrayOrObject, RawArray, RawObject } from "mingo/types";
-import { getType, isObject, resolve } from "mingo/util";
+import { Query } from "mingo/query";
+import {
+  AnyVal,
+  ArrayOrObject,
+  Callback,
+  RawArray,
+  RawObject
+} from "mingo/types";
+import { assert, getType, isArray, isObject, resolve, walk } from "mingo/util";
 
 const KEYED_OPERATORS_MAP: {
   [k: string]: {
@@ -94,4 +101,113 @@ export function cloneFrozen<T>(obj: T): T {
     return Object.freeze(clone);
   }
   return Object.freeze(obj);
+}
+
+const FILTER_IDENT_RE = /^[a-z]+[a-zA-Z0-9]*$/;
+
+export type PathNode = {
+  parent: string;
+  child?: string;
+  next?: PathNode;
+};
+/**
+ * Tokening a selector path to extract parts for the root, arrayFilter, and child
+ * @param path The path to tokenize
+ * @returns {parent:string,elem:string,child:string}
+ */
+export function tokenizePath(path: string): [PathNode, string[]] {
+  if (!path.includes(".$")) {
+    return [{ parent: path }, []];
+  }
+  const begin = path.indexOf(".$");
+  const end = path.indexOf("]");
+  const parent = path.substring(0, begin);
+  // using "$" wildcard to represent every element.
+  const child = path.substring(begin + 3, end);
+  assert(
+    child === "" || FILTER_IDENT_RE.test(child),
+    "Array filter <identifier> must begin with a lowercase letter and contain only alphanumeric characters."
+  );
+  const rest = path.substring(end + 2);
+  const [next, elems] = rest ? tokenizePath(rest) : [];
+  return [
+    { parent, child: child || "$", next },
+    [child, ...(elems || [])].filter(Boolean)
+  ];
+}
+
+/**
+ * Applies an update function to a value to product a new value to modify an object in-place.
+ * @param o The object or array to modify.
+ * @param n The path node of the update selector.
+ * @param q Map of positional identifiers to queries for filtering.
+ * @param f The update function which accepts containver value and key.
+ */
+export const applyUpdate = (
+  o: ArrayOrObject,
+  n: PathNode,
+  q: Record<string, Query>,
+  f: Callback<void>,
+  opts?: RawObject
+) => {
+  const { parent, child: c, next } = n;
+  if (!c) {
+    walk(o, parent, f, opts);
+    return;
+  }
+  const t = resolve(o, parent) as RawArray;
+  // do nothing if we don't get correct type.
+  if (!isArray(t)) return;
+  // apply update to matching items.
+  t.forEach((e, i) => {
+    // filter if applicable.
+    const b = !q[c] || q[c].test({ [c]: e });
+    if (!b) return;
+    // apply update.
+    if (next) {
+      applyUpdate(e as ArrayOrObject, next, q, f);
+    } else {
+      f(t, i);
+    }
+  });
+};
+
+export type Action<T = AnyVal> = (
+  val: T,
+  pathNode: PathNode,
+  queries: Record<string, Query>
+) => void;
+
+export function walkExpression<T>(
+  expr: RawObject,
+  arrayFilter: RawObject[],
+  callback: Action<T>
+) {
+  for (const [selector, val] of Object.entries(expr)) {
+    const [node, vars] = tokenizePath(selector);
+    if (!vars.length) {
+      callback(val as T, node, {});
+    } else {
+      // extract conditions for each identifier
+      const conditions: Record<string, RawObject> = {};
+      arrayFilter.forEach(o => {
+        Object.keys(o).forEach(k => {
+          vars.forEach(w => {
+            if (k === w || k.startsWith(w + ".")) {
+              conditions[w] = conditions[w] || {};
+              Object.assign(conditions[w], { [k]: o[k] });
+            }
+          });
+        });
+      });
+      // create queries for each identifier
+      const queries: Record<string, Query> = {};
+      const options = { useStrictMode: false };
+      for (const [k, condition] of Object.entries(conditions)) {
+        queries[k] = new Query(condition, options);
+      }
+
+      callback(val as T, node, queries);
+    }
+  }
 }

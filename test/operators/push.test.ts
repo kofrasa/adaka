@@ -4,7 +4,7 @@ import { UPDATE_OPTIONS } from "../helper";
 describe("operators/push", () => {
   it("Append a Value to an Array", () => {
     const state = { _id: 1, scores: [44, 78, 38, 80] };
-    $push(state, { scores: 89 }, UPDATE_OPTIONS);
+    $push(state, { scores: 89 }, [], UPDATE_OPTIONS);
     expect(state).toEqual({ _id: 1, scores: [44, 78, 38, 80, 89] });
   });
 
@@ -17,7 +17,7 @@ describe("operators/push", () => {
         { _id: 4, scores: [47, 78, 38, 80, 89] }
       ]
     };
-    $push(state, { "allScores.scores": 95 }, UPDATE_OPTIONS);
+    $push(state, { "allScores.scores": 95 }, [], UPDATE_OPTIONS);
     expect(state).toEqual({
       _id: 1,
       allScores: [
@@ -51,6 +51,7 @@ describe("operators/push", () => {
           $slice: 3
         }
       },
+      [],
       UPDATE_OPTIONS
     );
     expect(state).toEqual({
@@ -74,6 +75,7 @@ describe("operators/push", () => {
             $slice: -5
           }
         },
+        [],
         UPDATE_OPTIONS
       );
       expect(state).toEqual({ _id: 1, scores: [50, 60, 80, 78, 86] });
@@ -89,6 +91,7 @@ describe("operators/push", () => {
             $slice: 3
           }
         },
+        [],
         UPDATE_OPTIONS
       );
       expect(state).toEqual({ _id: 2, scores: [89, 90, 100] });
@@ -104,6 +107,7 @@ describe("operators/push", () => {
             $slice: -3
           }
         },
+        [],
         UPDATE_OPTIONS
       );
       expect(state).toEqual({ _id: 3, scores: [70, 100, 20] });
@@ -122,6 +126,7 @@ describe("operators/push", () => {
             $position: 0
           }
         },
+        [],
         UPDATE_OPTIONS
       );
 
@@ -140,6 +145,7 @@ describe("operators/push", () => {
             $position: 2
           }
         },
+        [],
         UPDATE_OPTIONS
       );
 
@@ -156,6 +162,7 @@ describe("operators/push", () => {
             $position: -2
           }
         },
+        [],
         UPDATE_OPTIONS
       );
 
@@ -188,6 +195,7 @@ describe("operators/push", () => {
             $sort: { score: 1 }
           }
         },
+        [],
         UPDATE_OPTIONS
       );
 
@@ -205,13 +213,18 @@ describe("operators/push", () => {
 
     it("Sort Array Elements That Are Not Documents", () => {
       const state = { _id: 2, tests: [89, 70, 89, 50] };
-      $push(state, { tests: { $each: [40, 60], $sort: 1 } }, UPDATE_OPTIONS);
+      $push(
+        state,
+        { tests: { $each: [40, 60], $sort: 1 } },
+        [],
+        UPDATE_OPTIONS
+      );
       expect(state.tests).toEqual([40, 50, 60, 70, 89, 89]);
     });
 
     it("Update Array Using Sort Only", () => {
       const state = { _id: 3, tests: [89, 70, 100, 20] };
-      $push(state, { tests: { $each: [], $sort: -1 } }, UPDATE_OPTIONS);
+      $push(state, { tests: { $each: [], $sort: -1 } }, [], UPDATE_OPTIONS);
       expect(state).toEqual({ _id: 3, tests: [100, 89, 70, 20] });
     });
   });

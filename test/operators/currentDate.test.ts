@@ -11,6 +11,7 @@ describe("operators/currentDate", () => {
         lastModified: true,
         "cancellation.date": true
       },
+      [],
       UPDATE_OPTIONS
     );
     expect(state.lastModified).toBeGreaterThan(past);

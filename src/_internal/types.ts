@@ -14,5 +14,6 @@ export interface UpdateOptions {
 export type UpdateOperator = (
   obj: RawObject,
   expr: RawObject,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => void;

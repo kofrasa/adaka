@@ -1,25 +1,28 @@
-import { ArrayOrObject, Callback, RawArray, RawObject } from "mingo/types";
-import { walk } from "mingo/util";
+import { ArrayOrObject, RawArray, RawObject } from "mingo/types";
 
 import { UpdateOptions } from "../types";
+import { Action, applyUpdate, walkExpression } from "../util";
 
 /** Removes the first or last element of an array. */
 export const $pop = (
   obj: RawObject,
   expr: Record<string, 1 | -1>,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => {
-  for (const [selector, pos] of Object.entries(expr)) {
-    walk(obj, selector, ((o: ArrayOrObject, k: string) => {
+  walkExpression(expr, arrayFilters, ((val, node, queries) => {
+    let changed = false;
+    applyUpdate(obj, node, queries, (o: ArrayOrObject, k: string) => {
       const arr = o[k] as RawArray;
       if (arr.length) {
-        if (pos === -1) {
-          o[k] = arr.slice(1);
+        if (val === -1) {
+          arr.splice(0, 1);
         } else {
           arr.pop();
         }
-        options.emit(selector);
+        changed = true;
       }
-    }) as Callback);
-  }
+    });
+    if (changed) options.emit(node.parent);
+  }) as Action<number>);
 };

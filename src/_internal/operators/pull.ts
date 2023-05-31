@@ -1,22 +1,18 @@
 import { Query } from "mingo/query";
-import {
-  AnyVal,
-  ArrayOrObject,
-  Callback,
-  RawArray,
-  RawObject
-} from "mingo/types";
-import { isObject, isOperator, walk } from "mingo/util";
+import { AnyVal, ArrayOrObject, RawArray, RawObject } from "mingo/types";
+import { isObject, isOperator } from "mingo/util";
 
 import { UpdateOptions } from "../types";
+import { Action, applyUpdate, walkExpression } from "../util";
 
 /** Removes from an existing array all instances of a value or values that match a specified condition. */
 export const $pull = (
   obj: RawObject,
   expr: RawObject,
+  arrayFilters: RawObject[],
   options: UpdateOptions
 ) => {
-  for (const [selector, val] of Object.entries(expr)) {
+  walkExpression(expr, arrayFilters, ((val, node, queries) => {
     const valExpr = {};
     const condition = {
       k: valExpr
@@ -33,21 +29,23 @@ export const $pull = (
     const query = new Query(condition);
     const pred = (v: AnyVal) => query.test({ k: v });
 
-    walk(obj, selector, ((o: ArrayOrObject, k: string) => {
+    let changed = false;
+
+    applyUpdate(obj, node, queries, (o: ArrayOrObject, k: string) => {
       const prev = o[k] as RawArray;
       const curr = new Array<AnyVal>();
-      const changed = prev
+      const emit = prev
         .map(v => {
           const b = pred(v);
           if (!b) curr.push(v);
           return b;
         })
         .some(Boolean);
-
-      if (changed) {
+      if (emit) {
         o[k] = curr;
-        options.emit(selector);
+        changed = true;
       }
-    }) as Callback);
-  }
+    });
+    if (changed) options.emit(node.parent);
+  }) as Action);
 };

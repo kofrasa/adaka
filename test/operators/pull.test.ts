@@ -11,6 +11,7 @@ describe("operators/pull", () => {
     $pull(
       state,
       { fruits: { $in: ["apples", "oranges"] }, vegetables: "carrots" },
+      [],
       UPDATE_OPTIONS
     );
     expect(state).toEqual({
@@ -22,7 +23,7 @@ describe("operators/pull", () => {
 
   it("Remove All Items That Match a Specified $pull Condition", () => {
     const state = { _id: 1, votes: [3, 5, 6, 7, 7, 8] };
-    $pull(state, { votes: { $gte: 6 } }, UPDATE_OPTIONS);
+    $pull(state, { votes: { $gte: 6 } }, [], UPDATE_OPTIONS);
     expect(state).toEqual({ _id: 1, votes: [3, 5] });
   });
 
@@ -34,7 +35,7 @@ describe("operators/pull", () => {
         { item: "B", score: 8 }
       ]
     };
-    $pull(state, { results: { score: 8, item: "B" } }, UPDATE_OPTIONS);
+    $pull(state, { results: { score: 8, item: "B" } }, [], UPDATE_OPTIONS);
     expect(state).toEqual({ _id: 1, results: [{ item: "A", score: 5 }] });
   });
 });
