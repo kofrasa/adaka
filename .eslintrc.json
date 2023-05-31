@@ -15,8 +15,7 @@
     "plugin:import/typescript",
     "plugin:import/errors",
     "plugin:import/warnings",
-    "plugin:prettier/recommended",
-    "plugin:react-hooks/recommended"
+    "plugin:prettier/recommended"
   ],
   "plugins": ["simple-import-sort", "import", "unused-imports"],
   "rules": {

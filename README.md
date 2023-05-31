@@ -121,34 +121,7 @@ function ShowErrorTypes() {
 
 ## MongoDB Query Support
 
-This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query support and loads only the basic operators for booleans and comparisons by default. To get access to more expression or accumulator operators, you can register them directly before use. See [readme](https://www.npmjs.com/package/mingo) page for more information.
-
-### Example: Registering and using an expression operators.
-
-```js
-import { useOperators, OperatorType, OperatorMap } from "mingo/core";
-import { $trunc, $map } from "mingo/operators/expression";
-import { createStore } from "adaka"
-
-// register operators to support
-useOperators(OperatorType.EXPRESSION, { $trunc, $map } as OperatorMap);
-
-// referring to previous example.
-const store = createStore<{metrics: number[]}>({
-  metrics: [55.97234, 12.08834, 78.80023, 53.0098832]
-})
-
-const truncatedMetrics = store.select<{metrics: number[]}>({
-  metrics: {
-    $map: {
-      input: "$metrics",
-      in: { $trunc: [ "$$this", 2 ] }
-    }
-  }
-})
-
-console.log(truncatedMetrics.get()) // {"metrics": [55.97, 12.08, 78.8, 53.01]}
-```
+This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query support and loads all supported `query`, `projection`, and `expression` operators. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
 
 ## TODO
 

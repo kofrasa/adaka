@@ -1,7 +1,8 @@
 import "mingo/init/basic";
 
-import { initOptions, Options } from "mingo/core";
+import { initOptions, OperatorType, Options, useOperators } from "mingo/core";
 import { Lazy } from "mingo/lazy";
+import * as expressionOperators from "mingo/operators/expression";
 import { $project } from "mingo/operators/pipeline";
 import { Query } from "mingo/query";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
@@ -10,6 +11,9 @@ import { assert, cloneDeep, has, stringify } from "mingo/util";
 import * as UPDATE_OPERATORS from "./operators";
 import { Listener, UpdateOperator } from "./types";
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
+
+// supports queries using $expr
+useOperators(OperatorType.EXPRESSION, expressionOperators);
 
 // https://stackoverflow.com/questions/60872063/enforce-typescript-object-has-exactly-one-key-from-a-set
 /** Define maps to enforce a single key from a union. */

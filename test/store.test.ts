@@ -1,14 +1,4 @@
-import { OperatorMap, OperatorType, useOperators } from "mingo/core";
-import { $concat, $map, $trunc } from "mingo/operators/expression";
-
 import { createStore, Selector, Store } from "../src";
-
-// register new expresions
-useOperators(OperatorType.EXPRESSION, {
-  $trunc,
-  $map,
-  $concat
-} as OperatorMap);
 
 const noop = () => {
   return;
