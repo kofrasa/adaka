@@ -124,11 +124,16 @@ export class Store<T extends RawObject> {
 
   /**
    * Dispatches an update expression to mutate the state. Triggers a notification to relevant selectors only.
-   * @param expr Update expression as a MongoDB update query.
-   * @param arrayFilters Array filter expressions to filter elements to update.
-   * @returns {boolean} Value indicating whether any value was updated.
+   * @param {RawObject} expr Update expression as a MongoDB update query.
+   * @param {Array<RawObject>} arrayFilters Array filter expressions to filter elements to update.
+   * @param {RawObject} condition Condition to check before applying update.
+   * @returns {Boolean} Status of update representing whether data changed.
    */
-  update(expr: UpdateExpression, arrayFilters: RawObject[] = []): boolean {
+  update(
+    expr: UpdateExpression,
+    arrayFilters: RawObject[] = [],
+    condition: RawObject = {}
+  ): boolean {
     // vaidate operator
     const e = Object.entries(expr);
     // check for single entry
@@ -137,6 +142,11 @@ export class Store<T extends RawObject> {
     // check operator exists
     assert(has(UPDATE_OPERATORS, op), `Operator '${op}' is not supported.`);
     const mutate = UPDATE_OPERATORS[op] as UpdateOperator;
+    // validate condition
+    if (Object.keys(condition).length) {
+      const q = new Query(condition, this.queryOptions);
+      if (!q.test(this.state)) return false;
+    }
     // setup change tracker
     const set = new Set<string>();
     const emit = (selector: string) => set.add(selector);

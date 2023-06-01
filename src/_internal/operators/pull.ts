@@ -1,6 +1,5 @@
 import { Query } from "mingo/query";
 import { AnyVal, ArrayOrObject, RawArray, RawObject } from "mingo/types";
-import { isObject, isOperator } from "mingo/util";
 
 import { UpdateOptions } from "../types";
 import { Action, applyUpdate, walkExpression } from "../util";
@@ -13,20 +12,7 @@ export const $pull = (
   options: UpdateOptions
 ) => {
   walkExpression(expr, arrayFilters, ((val, node, queries) => {
-    const valExpr = {};
-    const condition = {
-      k: valExpr
-    };
-
-    if (!isObject(val)) {
-      Object.assign(valExpr, { $in: [val] });
-    } else if (Object.keys(val).some(isOperator)) {
-      Object.assign(valExpr, val);
-    } else {
-      condition.k = val;
-    }
-
-    const query = new Query(condition);
+    const query = new Query({ k: val });
     const pred = (v: AnyVal) => query.test({ k: v });
 
     let changed = false;

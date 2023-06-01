@@ -29,6 +29,28 @@ describe("store", () => {
     selector = store.select<Pick<Person, "firstName">>({ firstName: 1 });
   });
 
+  it("should update store with condition", () => {
+    let status = store.update(
+      {
+        $set: { lasName: "Ankrah" }
+      },
+      [],
+      { lastName: "Appiah" }
+    );
+
+    expect(status).toEqual(false);
+
+    status = store.update(
+      {
+        $set: { lastName: "Adjei" }
+      },
+      [],
+      { lastName: "Osei" }
+    );
+
+    expect(status).toEqual(true);
+  });
+
   describe("selector", () => {
     describe("notifyAll", () => {
       it("should notify all subscribers", () => {
