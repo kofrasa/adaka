@@ -124,9 +124,11 @@ export class Store<T extends RawObject> {
 
   /**
    * Dispatches an update expression to mutate the state. Triggers a notification to relevant selectors only.
-   * @param expr A MongoDB update expression.
+   * @param expr Update expression as a MongoDB update query.
+   * @param arrayFilters Array filter expressions to filter elements to update.
+   * @returns {boolean} Value indicating whether any value was updated.
    */
-  update(expr: UpdateExpression, arrayFilters: RawObject[] = []): void {
+  update(expr: UpdateExpression, arrayFilters: RawObject[] = []): boolean {
     // vaidate operator
     const e = Object.entries(expr);
     // check for single entry
@@ -140,12 +142,15 @@ export class Store<T extends RawObject> {
     const emit = (selector: string) => set.add(selector);
     // apply updates
     mutate(this.state, args, arrayFilters, { emit });
+    // return if state is unchanged
+    if (!set.size) return false;
     // notify subscribers
     const changed = Array.from(set);
     this.selectors.forEach(o => {
       const cb = this.signals.get(o);
       if (cb) cb(changed);
     });
+    return true;
   }
 }
 
