@@ -67,15 +67,6 @@ export class Store<T extends RawObject> {
     });
   }
 
-  /** A callback to ensure only selectors with subscribers are notified.  */
-  private emit(s: Selector<RawObject>, subs: number) {
-    if (subs === 0) {
-      this.selectors.delete(s);
-    } else if (this.signals.has(s)) {
-      this.selectors.add(s);
-    }
-  }
-
   /**
    * Creates a new observable for a view of the state.
    * @param projection Fields of the state to view. Expressed as MongoDB projection query.
@@ -93,6 +84,7 @@ export class Store<T extends RawObject> {
     // reuse selectors
     const hash = stringify({ c: condition, p: projection });
     if (this.hashIndex.has(hash)) {
+      // anytime we pull selector from cache, we should mark it as dirty.
       return this.hashIndex.get(hash) as Selector<P>;
     }
 
@@ -106,8 +98,7 @@ export class Store<T extends RawObject> {
       this.state,
       projection,
       new Query(condition, this.queryOptions),
-      this.queryOptions,
-      (s: Selector<P>, n: number) => this.emit(s as Selector<RawObject>, n)
+      this.queryOptions
     );
     const pred = sameAncestor.bind(null, expected) as Predicate<AnyVal>;
     // function to detect changes and notify observers
@@ -115,8 +106,11 @@ export class Store<T extends RawObject> {
       const usize = new Set(changed.concat(expected)).size;
       const tsize = expected.length + changed.length;
       // notify listeners only when change is detected
-      if (usize < tsize || changed.some(pred)) selector.notifyAll();
+      if (usize < tsize || changed.some(pred)) {
+        selector.notifyAll();
+      }
     };
+    this.selectors.add(selector);
     this.signals.set(selector as Selector<RawObject>, signal);
     this.hashIndex.set(hash, selector as Selector<RawObject>);
     return selector;
@@ -190,16 +184,8 @@ export class Selector<T extends RawObject> {
     private readonly state: RawObject,
     private readonly projection: Record<keyof T, AnyVal>,
     private readonly query: Query,
-    private readonly options: Options,
-    private readonly emit: (s: Selector<T>, n: number) => void
+    private readonly options: Options
   ) {}
-
-  private doEmit() {
-    const size = this.listeners.size;
-    if (size === 1 || size === 0) {
-      this.emit(this, this.listeners.size);
-    }
-  }
 
   /**
    * Return the current value from state if the condition is fulfilled.
@@ -207,16 +193,17 @@ export class Selector<T extends RawObject> {
    * @returns {T | undefined}
    */
   get(): T | undefined {
+    // return cached if value has not changed since
     if (this.cached) return this.value;
     // update cached status
     this.cached = true;
     // project fields and freeze final value if query passes
-    const exists = this.query.test(this.state);
-    return (this.value = exists
+    this.value = this.query.test(this.state)
       ? ($project(Lazy([this.state]), this.projection, this.options)
           .map(cloneFrozen)
           .next().value as T)
-      : undefined);
+      : undefined;
+    return this.value;
   }
 
   /**
@@ -226,8 +213,11 @@ export class Selector<T extends RawObject> {
    * If a listener throws an exception when notified, it is removed and does not receive future notifications.
    */
   notifyAll(): void {
-    // clear cache when notifyAll() is called.
+    // reset the cache when notifyAll() is called.
     this.cached = false;
+    // only recompute if there are active listeners.
+    if (!this.listeners.size) return;
+    // compute new value.
     const val = this.get();
     if (val !== undefined) {
       /*eslint-disable*/
@@ -243,7 +233,6 @@ export class Selector<T extends RawObject> {
           }
         }
       }
-      this.doEmit();
       /*eslint-disable-enable*/
     }
   }
@@ -254,7 +243,6 @@ export class Selector<T extends RawObject> {
   removeAll() {
     this.listeners.clear();
     this.onceOnly.clear();
-    this.doEmit();
   }
 
   /**
@@ -270,11 +258,9 @@ export class Selector<T extends RawObject> {
     }
     if (!this.listeners.has(listener)) {
       this.listeners.add(listener);
-      this.doEmit();
     }
     return () => {
       this.listeners.delete(listener);
-      this.doEmit();
     };
   }
 
@@ -312,12 +298,10 @@ export class Selector<T extends RawObject> {
     if (!this.onceOnly.has(listener)) {
       this.listeners.add(listener);
       this.onceOnly.add(listener);
-      this.doEmit();
     }
     return () => {
       this.listeners.delete(listener);
       this.onceOnly.delete(listener);
-      this.doEmit();
     };
   }
 }

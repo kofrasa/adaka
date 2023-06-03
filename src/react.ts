@@ -17,7 +17,7 @@ export const createSelectorHook = <T extends RawObject>(
     const selector = store.select(projection, condition);
     if (!subscribers.has(selector)) {
       subscribers.set(selector, ((cb: Callback<void>) =>
-        selector.listen(cb)) as Callback);
+        selector.listenNow(cb)) as Callback);
     }
     return useSyncExternalStore(
       subscribers.get(selector) as Callback<Callback>,
