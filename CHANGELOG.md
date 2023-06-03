@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.0.1 / 2023-06-xx
+## 0.0.0 / 2023-06-03
 
 - Initial release.
-- Support update operators;
+- Support update operators with array filters;
   - `$currentDate`, `$inc`, `$max`, `$min`, `$mul`.
   - `$[]`, `$[<identifier>]`, `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
   - `$set`, `$unset`.
