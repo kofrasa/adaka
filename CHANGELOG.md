@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.1 / 2023-06-04
+- Moved React integration to separate package [reack-adaka](https://www.npmjs.com/package/react-adaka).
+
 ## 0.0.0 / 2023-06-03
 
 - Initial release.

@@ -16,15 +16,15 @@ High-precision state management using MongoDB query language.
 ## Features
 
 - Manage state as a single document modifiable only through the store API.
-- Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language. Supported operators include;
-  - Field Update Operators; `$currentDate`, `$inc`, `$max`, `$min`, `$mul`, `$set`, `$unset`.
-  - Array Update Operators; `$[]`, `$[<identifier>]`, `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
+- Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language. Supported update operators include;
+  - Field Operators; `$currentDate`, `$inc`, `$max`, `$min`, `$mul`, `$set`, `$unset`.
+  - Array Operators; `$[]`, `$[<identifier>]`, `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
 - Create selectors to observe a view of the state with full access to query language for reshaping data.
 - Listen for changes in state view in order to react to updates.
 - Restrict state notifications with conditions expressed as MongoDB queries.
 - Automatically unsubscribes a listener if it throws an exception.
 - Performs value equality using deep equal.
-- React integration via `createSelectorHook`.
+- React integration via [react-adaka](https://www.npmjs.com/package/react-adaka).
 
 ## Usage
 
@@ -93,11 +93,10 @@ selector.get() // { secondChild: 'Adrian' }
 ```
 
 ### React Integration
-React `>=18.0.0` is required to use this integration. The library expects it as a peer dependency.
+The [react-adaka](https://www.npmjs.com/package/react-adaka) and React `>=18.2.0` libraries are required to use this integration.
 
 ```jsx
-import { createStore } from "adaka";
-import { createSelectorHook } from "adaka/react"
+import { createStore, createSelectorHook } from "react-adaka"
 
 // first create your store
 const store = createStore({
