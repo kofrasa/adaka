@@ -1,29 +1,19 @@
 import "mingo/init/basic";
 
+import { Query } from "mingo";
 import { initOptions, OperatorType, Options, useOperators } from "mingo/core";
 import { Lazy } from "mingo/lazy";
 import * as expressionOperators from "mingo/operators/expression";
 import { $project } from "mingo/operators/pipeline";
-import { Query } from "mingo/query";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
-import { assert, cloneDeep, has, stringify } from "mingo/util";
+import { UpdateExpression, updateObject } from "mingo/updater";
+import { cloneDeep, stringify } from "mingo/util";
 
-import * as UPDATE_OPERATORS from "./operators";
-import { Listener, UpdateOperator } from "./types";
+import { Listener } from "./types";
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 
 // supports queries using $expr
 useOperators(OperatorType.EXPRESSION, expressionOperators);
-
-// https://stackoverflow.com/questions/60872063/enforce-typescript-object-has-exactly-one-key-from-a-set
-/** Define maps to enforce a single key from a union. */
-type OneKey<K extends keyof any, V, KK extends keyof any = K> = {
-  [P in K]: { [Q in P]: V } & { [Q in Exclude<KK, P>]?: never } extends infer O
-    ? { [Q in keyof O]: O[Q] }
-    : never;
-}[K];
-
-export type UpdateExpression = OneKey<keyof typeof UPDATE_OPERATORS, RawObject>;
 
 /**
  * Creates a new store object.
@@ -92,7 +82,7 @@ export class Store<T extends RawObject> {
     const [cond, proj] = [condition, projection].map(o =>
       Array.from(extractKeyPaths(o))
     );
-    const expected = cloneFrozen(Array.from(new Set(cond.concat(proj))));
+    const expected = Array.from(new Set(cond.concat(proj)));
     // create and add a new selector
     const selector = new Selector<P>(
       this.state,
@@ -128,28 +118,10 @@ export class Store<T extends RawObject> {
     arrayFilters: RawObject[] = [],
     condition: RawObject = {}
   ): boolean {
-    // vaidate operator
-    const e = Object.entries(expr);
-    // check for single entry
-    assert(e.length === 1, "Update expression must contain only one operator.");
-    const [op, args] = e[0];
-    // check operator exists
-    assert(has(UPDATE_OPERATORS, op), `Operator '${op}' is not supported.`);
-    const mutate = UPDATE_OPERATORS[op] as UpdateOperator;
-    // validate condition
-    if (Object.keys(condition).length) {
-      const q = new Query(condition, this.queryOptions);
-      if (!q.test(this.state)) return false;
-    }
-    // setup change tracker
-    const set = new Set<string>();
-    const emit = (selector: string) => set.add(selector);
-    // apply updates
-    mutate(this.state, args, arrayFilters, { emit });
+    const changed = updateObject(this.state, expr, arrayFilters, condition);
     // return if state is unchanged
-    if (!set.size) return false;
+    if (!changed.length) return false;
     // notify subscribers
-    const changed = Array.from(set);
     this.selectors.forEach(o => {
       const cb = this.signals.get(o);
       if (cb) cb(changed);
