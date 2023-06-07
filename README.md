@@ -16,12 +16,10 @@ High-precision state management using MongoDB query language.
 ## Features
 
 - Manage state as a single document modifiable only through the store API.
-- Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language. Supported update operators include;
-  - Field Operators; `$currentDate`, `$inc`, `$max`, `$min`, `$mul`, `$set`, `$unset`.
-  - Array Operators; `$[]`, `$[<identifier>]`, `$addToSet`, `$pop`, `$pull`, `$pullAll`, `$push`.
+- Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language.
 - Create selectors to observe a view of the state with full access to query language for reshaping data.
 - Listen for changes in state view in order to react to updates.
-- Restrict state notifications with conditions expressed as MongoDB queries.
+- Restrict state notifications with conditions expressed as queries.
 - Automatically unsubscribes a listener if it throws an exception.
 - Performs value equality using deep equal.
 - React integration via [react-adaka](https://www.npmjs.com/package/react-adaka).
@@ -118,9 +116,9 @@ function ShowErrorTypes() {
 }
 ```
 
-## MongoDB Query Support
+## MongoDB Query and Update Support
 
-This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query support and loads all supported `query`, `projection`, and `expression` operators. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
+This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query language support and loads all supported `query`, `projection`, `expression`, and `update` operators. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
 
 ## TODO
 

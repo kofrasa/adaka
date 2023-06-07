@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.2 / 2023-06-xx
+- Upgrade to `mingo@6.4.0` for full update operator support.
+
 ## 0.0.1 / 2023-06-04
 - Moved React integration to separate package [reack-adaka](https://www.npmjs.com/package/react-adaka).
 
