@@ -1,19 +1,30 @@
 import "mingo/init/basic";
 
 import { Query } from "mingo";
-import { initOptions, OperatorType, Options, useOperators } from "mingo/core";
+import {
+  initOptions,
+  OperatorType,
+  Options as QueryOptions,
+  UpdateOptions,
+  useOperators
+} from "mingo/core";
 import { Lazy } from "mingo/lazy";
 import * as expressionOperators from "mingo/operators/expression";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
-import { UpdateExpression, updateObject } from "mingo/updater";
+import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
 import { cloneDeep, stringify } from "mingo/util";
 
-import { Listener } from "./types";
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 
 // supports queries using $expr
 useOperators(OperatorType.EXPRESSION, expressionOperators);
+
+/** Observes a selector for changes in store and optionally return updates to apply. */
+export type Listener<T extends RawObject> = Callback<void, T>;
+
+/** Options for use when creating a new store. */
+export type Options = UpdateOptions;
 
 /**
  * Creates a new store object.
@@ -24,7 +35,7 @@ useOperators(OperatorType.EXPRESSION, expressionOperators);
  */
 export function createStore<T extends RawObject>(
   initialState: T,
-  options?: { queryOptions: Options }
+  options?: Options
 ): Store<T> {
   return new Store<T>(initialState, options);
 }
@@ -47,14 +58,17 @@ export class Store<T extends RawObject> {
     Callback<void, string[]>
   >();
   // query options to pass to MongoDB processing engine.
-  private readonly queryOptions: Options;
+  private readonly queryOptions: QueryOptions;
+  // the updater function
+  private readonly mutate: Updater;
 
-  constructor(initialState: T, options?: { queryOptions: Options }) {
+  constructor(initialState: T, options?: Options) {
     this.state = cloneDeep(initialState) as T;
     this.queryOptions = initOptions({
       ...options?.queryOptions,
       useStrictMode: false // force normal JavaScript semantics.
     });
+    this.mutate = createUpdater(options);
   }
 
   /**
@@ -118,7 +132,7 @@ export class Store<T extends RawObject> {
     arrayFilters: RawObject[] = [],
     condition: RawObject = {}
   ): boolean {
-    const changed = updateObject(this.state, expr, arrayFilters, condition);
+    const changed = this.mutate(this.state, expr, arrayFilters, condition);
     // return if state is unchanged
     if (!changed.length) return false;
     // notify subscribers
@@ -156,7 +170,7 @@ export class Selector<T extends RawObject> {
     private readonly state: RawObject,
     private readonly projection: Record<keyof T, AnyVal>,
     private readonly query: Query,
-    private readonly options: Options
+    private readonly options: QueryOptions
   ) {}
 
   /**

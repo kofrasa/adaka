@@ -26,7 +26,7 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "mingo": "^6.4.0"
+    "mingo": "^6.4.1"
   },
   "devDependencies": {
     "@types/jest": "^29.2.5",
