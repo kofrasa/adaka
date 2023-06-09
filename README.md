@@ -118,7 +118,7 @@ function ShowErrorTypes() {
 
 ## MongoDB Query and Update Support
 
-This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query language support and loads all supported `query`, `projection`, `expression`, and `update` operators. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
+This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query language support and loads only the basic supported `query`, `projection`, `expression`, and all `update` operators by default. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
 
 ## TODO
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.3 / 2023-06-09
+- Load only basic mingo operators by default.
+
 ## 0.0.2 / 2023-06-08
 - Upgrade to `mingo@6.4.1` for full update operator support.
 - Default to not cloning inputs on update.
