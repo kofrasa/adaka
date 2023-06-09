@@ -1,5 +1,9 @@
+import { OperatorType, useOperators } from "mingo/core";
+import { $concat } from "mingo/operators/expression";
+
 import { createStore, Selector, Store } from "../src";
 
+useOperators(OperatorType.EXPRESSION, { $concat });
 const noop = () => {
   return;
 };

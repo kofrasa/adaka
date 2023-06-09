@@ -3,22 +3,16 @@ import "mingo/init/basic";
 import { Query } from "mingo";
 import {
   initOptions,
-  OperatorType,
   Options as QueryOptions,
-  UpdateOptions,
-  useOperators
+  UpdateOptions
 } from "mingo/core";
 import { Lazy } from "mingo/lazy";
-import * as expressionOperators from "mingo/operators/expression";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
 import { cloneDeep, stringify } from "mingo/util";
 
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
-
-// supports queries using $expr
-useOperators(OperatorType.EXPRESSION, expressionOperators);
 
 /** Observes a selector for changes in store and optionally return updates to apply. */
 export type Listener<T extends RawObject> = Callback<void, T>;
