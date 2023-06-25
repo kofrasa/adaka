@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.4 / 2023-06-25
+- Upgrade to `mingo@6.4.2` for `Context` support.
+
 ## 0.0.3 / 2023-06-09
 - Load only basic mingo operators by default.
 
