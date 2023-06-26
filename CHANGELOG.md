@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.5 / 2023-06-25
+- Add `mingo@6.4.2` as peerDependency.
+
 ## 0.0.4 / 2023-06-25
 - Upgrade to `mingo@6.4.2` for `Context` support.
 

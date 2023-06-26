@@ -1,5 +1,3 @@
-import "mingo/init/basic";
-
 import { Query } from "mingo";
 import {
   initOptions,

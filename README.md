@@ -11,7 +11,7 @@ High-precision state management using MongoDB query language.
 
 ## Install
 
-`npm i adaka`
+`npm i adaka mingo`
 
 ## Features
 
@@ -119,6 +119,8 @@ function ShowErrorTypes() {
 ## MongoDB Query and Update Support
 
 This package uses the [mingo](https://npmjs.com/package/mingo) library for MongoDB query language support and loads only the basic supported `query`, `projection`, `expression`, and all `update` operators by default. Refer to the [readme](https://www.npmjs.com/package/mingo) page for more information.
+
+The `mingo` libray is added as a **peer dependency** to enable users to select only required operators using the `context` option so that tree-shaking can work effectively. Basic `mingo` operators are loaded into the global context by default.
 
 ## TODO
 
