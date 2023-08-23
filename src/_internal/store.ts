@@ -8,7 +8,7 @@ import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
-import { cloneDeep, stringify } from "mingo/util";
+import { cloneDeep, isEqual, stringify } from "mingo/util";
 
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 
@@ -17,6 +17,8 @@ export type Listener<T extends RawObject> = Callback<void, T>;
 
 /** Options for use when creating a new store. */
 export type Options = UpdateOptions;
+
+const NOT_FOUND = Symbol();
 
 /**
  * Creates a new store object.
@@ -165,6 +167,23 @@ export class Selector<T extends RawObject> {
     private readonly options: QueryOptions
   ) {}
 
+  private notifyWith(val: T) {
+    for (const cb of this.listeners) {
+      /*eslint-disable*/
+      try {
+        cb(val);
+      } catch {
+        this.listeners.delete(cb);
+      } finally {
+        if (this.onceOnly.has(cb)) {
+          this.listeners.delete(cb);
+          this.onceOnly.delete(cb);
+        }
+      }
+      /*eslint-disable-enable*/
+    }
+  }
+
   /**
    * Return the current value from state if the condition is fulfilled.
    * The returned value is cached for subsequent calls until notifyAll() is called.
@@ -185,33 +204,34 @@ export class Selector<T extends RawObject> {
   }
 
   /**
-   * Run all the listeners with the current value of the selector if not undefined.
+   * Notify all listeners with the current value of the selector if it is not undefined.
    * When the value is 'undefined' the listeners will not be invoked because it is indistinguishable from a failed condition.
    * Callers should never store undefined values in the store. Update operations ignore undefined values.
    * If a listener throws an exception when notified, it is removed and does not receive future notifications.
    */
   notifyAll(): void {
-    // reset the cache when notifyAll() is called.
-    this.cached = false;
     // only recompute if there are active listeners.
     if (!this.listeners.size) return;
+    // reset the cache when notifyAll() is called.
+    this.cached = false;
     // compute new value.
     const val = this.get();
     if (val !== undefined) {
-      /*eslint-disable*/
-      for (const cb of this.listeners) {
-        try {
-          cb(val);
-        } catch {
-          this.listeners.delete(cb);
-        } finally {
-          if (this.onceOnly.has(cb)) {
-            this.listeners.delete(cb);
-            this.onceOnly.delete(cb);
-          }
-        }
-      }
-      /*eslint-disable-enable*/
+      this.notifyWith(val);
+    }
+  }
+
+  /** Invokes listeners only if the selector result has changed. */
+  notifyChanged() {
+    // only recompute if there are active listeners.
+    if (!this.listeners.size) return;
+    const prev = this.cached ? this.get() : NOT_FOUND;
+    // reset the cache when notifyChanged() is called.
+    this.cached = false;
+    // compute new value.
+    const val = this.get();
+    if (!isEqual(prev, val)) {
+      this.notifyWith(val);
     }
   }
 

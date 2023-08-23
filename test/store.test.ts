@@ -8,7 +8,7 @@ const noop = () => {
   return;
 };
 
-describe("store", () => {
+describe("Store", () => {
   type Person = {
     firstName: string;
     lastName: string;
@@ -33,31 +33,33 @@ describe("store", () => {
     selector = store.select<Pick<Person, "firstName">>({ firstName: 1 });
   });
 
-  it("should update store with condition", () => {
-    let status = store.update(
-      {
-        $set: { lasName: "Ankrah" }
-      },
-      [],
-      { lastName: "Appiah" }
-    );
+  describe("update", () => {
+    it("should update store with condition", () => {
+      let status = store.update(
+        {
+          $set: { lasName: "Ankrah" }
+        },
+        [],
+        { lastName: "Appiah" }
+      );
 
-    expect(status).toEqual(false);
+      expect(status).toEqual(false);
 
-    status = store.update(
-      {
-        $set: { lastName: "Adjei" }
-      },
-      [],
-      { lastName: "Osei" }
-    );
+      status = store.update(
+        {
+          $set: { lastName: "Adjei" }
+        },
+        [],
+        { lastName: "Osei" }
+      );
 
-    expect(status).toEqual(true);
+      expect(status).toEqual(true);
+    });
   });
 
-  describe("selector", () => {
+  describe("Selector", () => {
     describe("notifyAll", () => {
-      it("should notify all subscribers", () => {
+      it("should notify all subscribers if the selector value is not undefined", () => {
         selector.listen(subscriber);
         expect(counter).toEqual(0);
 
@@ -66,6 +68,19 @@ describe("store", () => {
 
         selector.notifyAll();
         expect(counter).toEqual(2);
+      });
+    });
+
+    describe("notifyChanged", () => {
+      it("should notify all subscribers only when the selector value changes", () => {
+        selector.listen(subscriber);
+        expect(counter).toEqual(0);
+
+        selector.notifyChanged();
+        expect(counter).toEqual(1);
+
+        selector.notifyChanged();
+        expect(counter).toEqual(1);
       });
     });
 
