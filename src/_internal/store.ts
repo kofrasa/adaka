@@ -105,7 +105,7 @@ export class Store<T extends RawObject> {
       const tsize = expected.length + changed.length;
       // notify listeners only when change is detected
       if (usize < tsize || changed.some(pred)) {
-        selector.notifyAll();
+        selector.notifyChanged();
       }
     };
     this.selectors.add(selector);
@@ -167,26 +167,9 @@ export class Selector<T extends RawObject> {
     private readonly options: QueryOptions
   ) {}
 
-  private notifyWith(val: T) {
-    for (const cb of this.listeners) {
-      /*eslint-disable*/
-      try {
-        cb(val);
-      } catch {
-        this.listeners.delete(cb);
-      } finally {
-        if (this.onceOnly.has(cb)) {
-          this.listeners.delete(cb);
-          this.onceOnly.delete(cb);
-        }
-      }
-      /*eslint-disable-enable*/
-    }
-  }
-
   /**
    * Return the current value from state if the condition is fulfilled.
-   * The returned value is cached for subsequent calls until notifyAll() is called.
+   * The returned value is cached for subsequent calls until notifyChanged() is called.
    * @returns {T | undefined}
    */
   get(): T | undefined {
@@ -204,24 +187,6 @@ export class Selector<T extends RawObject> {
   }
 
   /**
-   * Notify all listeners with the current value of the selector if it is not undefined.
-   * When the value is 'undefined' the listeners will not be invoked because it is indistinguishable from a failed condition.
-   * Callers should never store undefined values in the store. Update operations ignore undefined values.
-   * If a listener throws an exception when notified, it is removed and does not receive future notifications.
-   */
-  notifyAll(): void {
-    // only recompute if there are active listeners.
-    if (!this.listeners.size) return;
-    // reset the cache when notifyAll() is called.
-    this.cached = false;
-    // compute new value.
-    const val = this.get();
-    if (val !== undefined) {
-      this.notifyWith(val);
-    }
-  }
-
-  /**
    * Notify all listeners with the current value of the selector if different from the previous value.
    * If a listener throws an exception when notified, it is removed and does not receive future notifications.
    */
@@ -234,7 +199,20 @@ export class Selector<T extends RawObject> {
     // compute new value.
     const val = this.get();
     if (!isEqual(prev, val)) {
-      this.notifyWith(val);
+      for (const cb of this.listeners) {
+        /*eslint-disable*/
+        try {
+          cb(val);
+        } catch {
+          this.listeners.delete(cb);
+        } finally {
+          if (this.onceOnly.has(cb)) {
+            this.listeners.delete(cb);
+            this.onceOnly.delete(cb);
+          }
+        }
+        /*eslint-disable-enable*/
+      }
     }
   }
 

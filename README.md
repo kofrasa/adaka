@@ -71,23 +71,42 @@ store.update({ $set: { name: "Odame" } }); // no output
 ```
 
 ### Select data only on condition
+A selector may use a condition to restrict when listeners are notified. When a condition is used listeners are notified
+only once for when the condition is false with a return value of `undefined`. Further updates that do not meet the condition
+do not trigger anymore notifications. On the other hand, any update that meets the condition triggers a notification.
 
 ```ts
-// second child if person under 30
+// store object.
+// ------------
+// {
+//   name: "John",
+//   age: 30,
+//   children: ["Luke"]
+// }
+
+// second child if person under 30.
 const selector = store.select<{ secondChild: string }>({
   secondChild: "$children.1"
-}), {age: {$lt: 30}};
+}, {age: {$lt: 30}});
+
+selector.listen(data => {
+  console.log("->", data);
+});
 
 selector.get() // undefined
 
 store.update({$set: {age: 25}})
-
 // no second child yet.
 selector.get() // {}
 
 store.update({ $push: { children: "Adrian"} })
+selector.get() // { secondChild: 'Adrian' }. listeners notified.
 
-selector.get() // { secondChild: 'Adrian' }
+store.update({ $set: { age: 35 } })
+selector.get() // undefined. listeners notified.
+
+store.update({ $set: { age: 40 } })
+selector.get() // undefined. no notifications because condition is false.
 ```
 
 ### React Integration

@@ -58,19 +58,6 @@ describe("Store", () => {
   });
 
   describe("Selector", () => {
-    describe("notifyAll", () => {
-      it("should notify all subscribers if the selector value is not undefined", () => {
-        selector.listen(subscriber);
-        expect(counter).toEqual(0);
-
-        selector.notifyAll();
-        expect(counter).toEqual(1);
-
-        selector.notifyAll();
-        expect(counter).toEqual(2);
-      });
-    });
-
     describe("notifyChanged", () => {
       it("should notify all subscribers only when the selector value changes", () => {
         selector.listen(subscriber);
@@ -89,11 +76,11 @@ describe("Store", () => {
         selector.listen(subscriber);
         expect(counter).toEqual(0);
 
-        selector.notifyAll();
+        selector.notifyChanged();
         expect(counter).toEqual(1);
 
         selector.removeAll();
-        selector.notifyAll();
+        selector.notifyChanged();
         expect(counter).toEqual(1);
       });
     });
@@ -230,13 +217,17 @@ describe("Store", () => {
         // notify on subscription.
         expect(counter).toEqual(1);
 
-        // does not pass condition. no notification.
+        // does not pass condition. notify to reflect change in condition.
         store.update({ $set: { age: 20 } });
-        expect(counter).toEqual(1);
+        expect(counter).toEqual(2);
+
+        // does not pass condition. last value has not changed
+        store.update({ $set: { age: 24 } });
+        expect(counter).toEqual(2);
 
         // notify subscriber. condition passes.
         store.update({ $set: { age: 40 } });
-        expect(counter).toEqual(2);
+        expect(counter).toEqual(3);
       });
 
       it("should unsubscribe listener and bubble exception on error", () => {
@@ -247,7 +238,7 @@ describe("Store", () => {
         ).toThrowError(/failed immediate invoke/);
 
         // subscriber was removed.
-        selector.notifyAll();
+        selector.notifyChanged();
       });
     });
 
@@ -259,24 +250,38 @@ describe("Store", () => {
         expect(selector.get()).toEqual({ fullName: "Kwame Osei" });
       });
 
-      it("should select field with condition", () => {
+      it("should select field based on condition", () => {
         // children only when parent is over 30+ years
-        const selector = store.select<{ children: string[] }>(
-          {
-            children: 1
-          },
-          {
-            age: { $gte: 30 }
-          }
+        const store = createStore({
+          age: 30,
+          children: ["Luke"]
+        });
+        const selector = store.select<{ secondChild: string }>(
+          { secondChild: "$children.1" },
+          { age: { $lt: 25 } }
         );
-        selector.listen(noop);
-        expect(selector.get()).toEqual({ children: ["Bediako"] });
+        let n = 0;
+        selector.listen(_ => {
+          n++;
+        });
 
-        store.update({ $set: { age: 25 } });
         expect(selector.get()).toBeUndefined();
 
+        store.update({ $set: { age: 20 } });
+        // no second child yet.
+        expect(selector.get()).toEqual({});
+        expect(n).toEqual(1); // notified
+
+        store.update({ $push: { children: "Adrian" } });
+        expect(selector.get()).toEqual({ secondChild: "Adrian" });
+        expect(n).toEqual(2); // notified
+
+        store.update({ $set: { age: 35 } });
+        expect(selector.get()).toBeUndefined();
+        expect(n).toEqual(3); // notified
+
         store.update({ $set: { age: 40 } });
-        expect(selector.get()).toEqual({ children: ["Bediako"] });
+        expect(n).toEqual(3); // no notification
       });
     });
   });
