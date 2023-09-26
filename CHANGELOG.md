@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.6 / 2023-09-26
+- Pin peer dependency as `mingo@6.x.x`.
+- Default clone mode to "copy".
+
 ## 0.0.5 / 2023-06-26
 - Add `mingo@6.4.2` as peerDependency.
 

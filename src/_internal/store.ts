@@ -62,7 +62,7 @@ export class Store<T extends RawObject> {
       ...options?.queryOptions,
       useStrictMode: false // force normal JavaScript semantics.
     });
-    this.mutate = createUpdater(options);
+    this.mutate = createUpdater({ cloneMode: "copy", ...options });
   }
 
   /**
@@ -221,7 +221,10 @@ export class Selector<T extends RawObject> {
     }
   }
 
-  /** Invokes listeners only if the selector result has changed. */
+  /**
+   * Notify all listeners with the current value of the selector if different from the previous value.
+   * If a listener throws an exception when notified, it is removed and does not receive future notifications.
+   */
   notifyChanged() {
     // only recompute if there are active listeners.
     if (!this.listeners.size) return;
