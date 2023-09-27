@@ -105,7 +105,7 @@ export class Store<T extends RawObject> {
       const tsize = expected.length + changed.length;
       // notify listeners only when change is detected
       if (usize < tsize || changed.some(pred)) {
-        selector.notifyChanged();
+        selector.notifyAll();
       }
     };
     this.selectors.add(selector);
@@ -169,7 +169,7 @@ export class Selector<T extends RawObject> {
 
   /**
    * Return the current value from state if the condition is fulfilled.
-   * The returned value is cached for subsequent calls until notifyChanged() is called.
+   * The returned value is cached for subsequent calls until notifyAll() is called.
    * @returns {T | undefined}
    */
   get(): T | undefined {
@@ -190,11 +190,11 @@ export class Selector<T extends RawObject> {
    * Notify all listeners with the current value of the selector if different from the previous value.
    * If a listener throws an exception when notified, it is removed and does not receive future notifications.
    */
-  notifyChanged() {
+  notifyAll() {
     // only recompute if there are active listeners.
     if (!this.listeners.size) return;
     const prev = this.cached ? this.get() : NOT_FOUND;
-    // reset the cache when notifyChanged() is called.
+    // reset the cache when notifyAll() is called.
     this.cached = false;
     // compute new value.
     const val = this.get();

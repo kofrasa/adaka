@@ -58,15 +58,15 @@ describe("Store", () => {
   });
 
   describe("Selector", () => {
-    describe("notifyChanged", () => {
+    describe("notifyAll", () => {
       it("should notify all subscribers only when the selector value changes", () => {
         selector.listen(subscriber);
         expect(counter).toEqual(0);
 
-        selector.notifyChanged();
+        selector.notifyAll();
         expect(counter).toEqual(1);
 
-        selector.notifyChanged();
+        selector.notifyAll();
         expect(counter).toEqual(1);
       });
     });
@@ -76,11 +76,11 @@ describe("Store", () => {
         selector.listen(subscriber);
         expect(counter).toEqual(0);
 
-        selector.notifyChanged();
+        selector.notifyAll();
         expect(counter).toEqual(1);
 
         selector.removeAll();
-        selector.notifyChanged();
+        selector.notifyAll();
         expect(counter).toEqual(1);
       });
     });
@@ -238,7 +238,7 @@ describe("Store", () => {
         ).toThrowError(/failed immediate invoke/);
 
         // subscriber was removed.
-        selector.notifyChanged();
+        selector.notifyAll();
       });
     });
 
@@ -265,6 +265,7 @@ describe("Store", () => {
           n++;
         });
 
+        // failed condition
         expect(selector.get()).toBeUndefined();
 
         store.update({ $set: { age: 20 } });
