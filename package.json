@@ -1,6 +1,6 @@
 {
   "name": "adaka",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "High-precision state management using MongoDB query language.",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
