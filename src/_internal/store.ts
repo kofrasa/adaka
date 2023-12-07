@@ -226,7 +226,6 @@ export class Selector<T extends RawObject> {
 
   /**
    * Register a listener to be notified about state updates.
-   * The listener is immediately invoked if the selector matches the state.
    * @param listener The observer function to receive data.
    * @returns {Callback} Function to unsubscribe listener.
    */
