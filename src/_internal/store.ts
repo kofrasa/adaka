@@ -15,23 +15,20 @@ import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 /** Observes a selector for changes in store and optionally return updates to apply. */
 export type Listener<T extends RawObject> = Callback<void, T>;
 
-/** Options for use when creating a new store. */
-export type Options = UpdateOptions;
-
-const NOT_FOUND = Symbol();
+const NONE = Symbol();
 
 /**
  * Creates a new store object.
  *
  * @param initialState The initial state object
- * @param options Options to be used for updates and queries.
+ * @param updateOptions Options to be used for updates and queries.
  * @returns {Store}
  */
 export function createStore<T extends RawObject>(
   initialState: T,
-  options?: Options
+  updateOptions?: UpdateOptions
 ): Store<T> {
-  return new Store<T>(initialState, options);
+  return new Store<T>(initialState, updateOptions);
 }
 
 /**
@@ -56,7 +53,7 @@ export class Store<T extends RawObject> {
   // the updater function
   private readonly mutate: Updater;
 
-  constructor(initialState: T, options?: Options) {
+  constructor(initialState: T, options?: UpdateOptions) {
     this.state = cloneDeep(initialState) as T;
     this.queryOptions = initOptions({
       ...options?.queryOptions,
@@ -193,7 +190,7 @@ export class Selector<T extends RawObject> {
   notifyAll() {
     // only recompute if there are active listeners.
     if (!this.listeners.size) return;
-    const prev = this.cached ? this.get() : NOT_FOUND;
+    const prev = this.cached ? this.get() : NONE;
     // reset the cache when notifyAll() is called.
     this.cached = false;
     // compute new value.

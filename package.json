@@ -25,8 +25,8 @@
     "README.md",
     "CHANGELOG.md"
   ],
-  "peerDependencies": {
-    "mingo": "^6.x.x"
+  "dependencies": {
+    "mingo": "^6.4.9"
   },
   "devDependencies": {
     "@types/jest": "^29.2.5",

@@ -11,7 +11,7 @@ High-precision state management using MongoDB query language.
 
 ## Install
 
-`npm i adaka mingo`
+`npm i adaka`
 
 ## Features
 
