@@ -59,7 +59,7 @@ export class Store<T extends RawObject> {
       ...options?.queryOptions,
       useStrictMode: false // force normal JavaScript semantics.
     });
-    this.mutate = createUpdater({ cloneMode: "copy", ...options });
+    this.mutate = createUpdater({ cloneMode: "none", ...options });
   }
 
   /**
