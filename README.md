@@ -4,7 +4,7 @@ High-precision state management using MongoDB query language.
 
 ![license](https://img.shields.io/github/license/kofrasa/adaka)
 [![version](https://img.shields.io/npm/v/adaka)](https://www.npmjs.org/package/adaka)
-[![build](https://github.com/kofrasa/adaka/actions/workflows/node.js.yml/badge.svg)](https://github.com/kofrasa/adaka/actions/workflows/node.js.yml)
+[![build](https://github.com/kofrasa/adaka/actions/workflows/build.yml/badge.svg)](https://github.com/kofrasa/adaka/actions/workflows/build.yml)
 ![issues](https://img.shields.io/github/issues/kofrasa/adaka)
 [![codecov](https://img.shields.io/codecov/c/github/kofrasa/adaka)](https://codecov.io/gh/kofrasa/adaka)
 [![npm downloads](https://img.shields.io/npm/dm/adaka)](https://www.npmjs.org/package/adaka)
