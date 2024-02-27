@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.8 / 2024-02-26
+**New**
+- Replace `boolean` with `UpdateResult` after an update operation.
+
 ## 0.0.7 / 2023-09-27
 - fix `notifyAll` semantics to behave correctly for conditions.
 
