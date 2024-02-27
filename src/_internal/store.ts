@@ -15,6 +15,16 @@ import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 /** Observes a selector for changes in store and optionally return updates to apply. */
 export type Listener<T extends RawObject> = Callback<void, T>;
 
+/** Result from update operation which returns useful details. */
+export type UpdateResult = {
+  /** Indicates whether the state was modified */
+  readonly modified: boolean;
+  /** Indicates the fields in the state that were changed if modified. */
+  readonly fields?: string[];
+  /** Indicates the number of listeners notified. */
+  readonly notifyCount?: number;
+};
+
 const NONE = Symbol();
 
 /**
@@ -46,7 +56,7 @@ export class Store<T extends RawObject> {
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
     Selector<RawObject>,
-    Callback<void, string[]>
+    Callback<boolean, string[]>
   >();
   // query options to pass to MongoDB processing engine.
   private readonly queryOptions: QueryOptions;
@@ -98,12 +108,12 @@ export class Store<T extends RawObject> {
     const pred = sameAncestor.bind(null, expected) as Predicate<AnyVal>;
     // function to detect changes and notify observers
     const signal = (changed: string[]) => {
-      const usize = new Set(changed.concat(expected)).size;
-      const tsize = expected.length + changed.length;
+      const isize = new Set(changed.concat(expected)).size; // intersection
+      const usize = expected.length + changed.length; // union
+      const notify = isize < usize || changed.some(pred);
       // notify listeners only when change is detected
-      if (usize < tsize || changed.some(pred)) {
-        selector.notifyAll();
-      }
+      if (notify) selector.notifyAll();
+      return notify;
     };
     this.selectors.add(selector);
     this.signals.set(selector as Selector<RawObject>, signal);
@@ -116,22 +126,31 @@ export class Store<T extends RawObject> {
    * @param {RawObject} expr Update expression as a MongoDB update query.
    * @param {Array<RawObject>} arrayFilters Array filter expressions to filter elements to update.
    * @param {RawObject} condition Condition to check before applying update.
-   * @returns {Boolean} Status of update representing whether data changed.
+   * @returns {UpdateResult} Result of the update operation.
    */
   update(
     expr: UpdateExpression,
     arrayFilters: RawObject[] = [],
     condition: RawObject = {}
-  ): boolean {
-    const changed = this.mutate(this.state, expr, arrayFilters, condition);
+  ): UpdateResult {
+    const fields = this.mutate(this.state, expr, arrayFilters, condition);
     // return if state is unchanged
-    if (!changed.length) return false;
+    if (!fields.length) {
+      return { modified: false };
+    }
     // notify subscribers
-    this.selectors.forEach(o => {
-      const cb = this.signals.get(o);
-      if (cb) cb(changed);
-    });
-    return true;
+    let notifyCount = 0;
+    for (const k of this.selectors) {
+      const selector = k as Selector<RawObject>;
+      const signal = this.signals.get(selector);
+      // take a snapshot of the size before sending the notification.
+      // this accounts for subscribers that may be removed after notification either from running only once or throwing an error.
+      const increment = selector.size;
+      if (signal(fields)) {
+        notifyCount += increment;
+      }
+    }
+    return { modified: true, fields, notifyCount };
   }
 }
 
@@ -163,6 +182,11 @@ export class Selector<T extends RawObject> {
     private readonly query: Query,
     private readonly options: QueryOptions
   ) {}
+
+  /** Returns the number of subscribers to this selector. */
+  get size(): number {
+    return this.listeners.size;
+  }
 
   /**
    * Return the current value from state if the condition is fulfilled.

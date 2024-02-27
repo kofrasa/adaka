@@ -4,9 +4,6 @@ import { $concat } from "mingo/operators/expression";
 import { createStore, Selector, Store } from "../src";
 
 useOperators(OperatorType.EXPRESSION, { $concat });
-const noop = () => {
-  return;
-};
 
 describe("Store", () => {
   type Person = {
@@ -43,7 +40,9 @@ describe("Store", () => {
         { lastName: "Appiah" }
       );
 
-      expect(status).toEqual(false);
+      expect(status).toEqual({
+        modified: false
+      });
 
       status = store.update(
         {
@@ -53,7 +52,11 @@ describe("Store", () => {
         { lastName: "Osei" }
       );
 
-      expect(status).toEqual(true);
+      expect(status).toEqual({
+        modified: true,
+        fields: ["lastName"],
+        notifyCount: 0
+      });
     });
   });
 
@@ -98,13 +101,23 @@ describe("Store", () => {
         selector.listen(subscriber);
         expect(counter).toEqual(0);
         // Henry - notify
-        expect(store.update({ $set: { firstName: "Henry" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Henry" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter).toEqual(1);
         // Kwame - notify
-        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter).toEqual(2);
         // Kwame - no notification
-        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual(false);
+        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual({
+          modified: false
+        });
         expect(counter).toEqual(2);
       });
 
@@ -116,15 +129,27 @@ describe("Store", () => {
         });
 
         expect(counter2).toEqual(0);
-        expect(store.update({ $set: { firstName: "Tiffany" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Tiffany" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter2).toEqual(1);
 
         // remove subscriber here.
-        expect(store.update({ $set: { firstName: "Tighe" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Tighe" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter2).toEqual(2);
 
         // no more notifications
-        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Kwame" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 0
+        });
         expect(counter2).toEqual(2);
       });
 
@@ -136,21 +161,37 @@ describe("Store", () => {
         const unsub = selector.listen(subscriber);
         expect(counter).toEqual(0);
 
-        expect(store.update({ $set: { firstName: "Kofi" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Kofi" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter).toEqual(1);
 
-        expect(store.update({ $set: { firstName: "Adwoa" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Adwoa" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
         expect(counter).toEqual(2);
 
         // update different part of object
-        expect(store.update({ $push: { children: "Ama" } })).toEqual(true);
+        expect(store.update({ $push: { children: "Ama" } })).toEqual({
+          modified: true,
+          fields: ["children"],
+          notifyCount: 0
+        });
         // no notification
         expect(counter).toEqual(2);
 
         // remove subscriber
         unsub();
         // update previously subscribed
-        expect(store.update({ $set: { firstName: "Kobby" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Kobby" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 0
+        });
         // no notification
         expect(counter).toEqual(2);
       });
@@ -170,19 +211,37 @@ describe("Store", () => {
         expect(counter).toEqual(0);
 
         // listen once
-        expect(store.update({ $set: { firstName: "Amoah" } })).toEqual(true);
-        expect(store.update({ $set: { firstName: "Amoah" } })).toEqual(false);
+        expect(store.update({ $set: { firstName: "Amoah" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
+        expect(store.update({ $set: { firstName: "Amoah" } })).toEqual({
+          modified: false
+        });
         expect(counter).toEqual(1);
 
         // no more notifications
-        expect(store.update({ $set: { firstName: "Donkor" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Donkor" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 0
+        });
         expect(counter).toEqual(1);
-        expect(store.update({ $push: { children: "Ama" } })).toEqual(true);
+        expect(store.update({ $push: { children: "Ama" } })).toEqual({
+          modified: true,
+          fields: ["children"],
+          notifyCount: 0
+        });
         expect(counter).toEqual(1);
 
         // can still remove subscriber safely no-op since already removed automatically.
         unsub();
-        expect(store.update({ $set: { firstName: "Odame" } })).toEqual(true);
+        expect(store.update({ $set: { firstName: "Odame" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 0
+        });
         // still no notification
         expect(counter).toEqual(1);
       });
