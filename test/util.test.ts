@@ -1,6 +1,6 @@
 import {
   cloneFrozen,
-  extractKeyPaths,
+  getDependentPaths,
   sameAncestor
 } from "../src/_internal/util";
 
@@ -48,37 +48,37 @@ describe("store", () => {
     });
   });
 
-  describe("extractKeyPaths", () => {
-    it.each([
+  describe("getDependentPaths", () => {
+    const commonFixtures: Array<[string[], unknown]> = [
       [["friend"], "$friend"],
-      [["name"], { name: "henry" }],
-      [["frank"], { $and: ["john", "$frank"] }],
-      [[], { $literal: { $literal: "$hero" } }],
+      [["name"], { newField: { $and: ["john", "$name"] } }],
+      [[], { newField: { $literal: "$hero" } }],
       [
         ["price", "qty"],
         {
-          $expr: {
-            $lt: [
-              {
-                $cond: {
-                  if: { $gte: ["$qty", 100] },
-                  then: { $multiply: ["$price", 0.5] },
-                  else: { $multiply: ["$price", 0.7] }
-                }
-              },
-              5
-            ]
+          newField: {
+            $expr: {
+              $lt: [
+                {
+                  $cond: {
+                    if: { $gte: ["$qty", 100] },
+                    then: { $multiply: ["$price", 0.5] },
+                    else: { $multiply: ["$price", 0.7] }
+                  }
+                },
+                5
+              ]
+            }
           }
         }
       ],
-      [["x"], { $expr: { $eq: [{ $divide: [1, "$x"] }, 3] } }],
+      [["x"], { newField: { $expr: { $eq: [{ $divide: [1, "$x"] }, 3] } } }],
       [
         ["results.product", "results.score"],
         { results: { $elemMatch: { product: "xyz", score: { $gte: 8 } } } }
       ],
-      [["tags"], { $and: [{ tags: "ssl" }, { tags: "security" }] }],
       [
-        ["item", "discount", "qty"],
+        ["item", "qty"],
         {
           item: 1,
           discount: {
@@ -89,62 +89,71 @@ describe("store", () => {
       [
         ["message", "scores", "total"],
         {
-          $switch: {
-            branches: [
-              {
-                case: { $gte: [{ $avg: "$scores" }, 90] },
-                then: "Doing great!"
-              },
-              {
-                case: {
-                  $and: [
-                    { $gte: [{ $avg: "$scores" }, 80] },
-                    { $lt: [{ $avg: "$total" }, 90] }
-                  ]
+          newField: {
+            $switch: {
+              branches: [
+                {
+                  case: { $gte: [{ $avg: "$scores" }, 90] },
+                  then: "Doing great!"
                 },
-                then: "Doing pretty well."
-              },
-              {
-                case: { $lt: [{ $avg: "$scores" }, 80] },
-                then: "$message"
-              }
-            ],
-            default: "No scores found."
+                {
+                  case: {
+                    $and: [
+                      { $gte: [{ $avg: "$scores" }, 80] },
+                      { $lt: [{ $avg: "$total" }, 90] }
+                    ]
+                  },
+                  then: "Doing pretty well."
+                },
+                {
+                  case: { $lt: [{ $avg: "$scores" }, 80] },
+                  then: "$message"
+                }
+              ],
+              default: "No scores found."
+            }
           }
         }
       ],
       [
         [],
         {
-          $filter: {
-            input: [1, "a", 2, null, 3.1, 4, "5"],
-            as: "num",
-            cond: { $and: [{ $gte: ["$$num", 3] }, { $gte: ["$$num", 5] }] },
-            limit: { $add: [0, 1] }
+          newField: {
+            $filter: {
+              input: [1, "a", 2, null, 3.1, 4, "5"],
+              as: "num",
+              cond: { $and: [{ $gte: ["$$num", 3] }, { $gte: ["$$num", 5] }] },
+              limit: { $add: [0, 1] }
+            }
           }
         }
       ],
       [
         ["quizzes"],
         {
-          $map: {
-            input: "$quizzes",
-            as: "grade",
-            in: { $add: ["$$grade", 2] }
+          newField: {
+            $map: {
+              input: "$quizzes",
+              as: "grade",
+              in: { $add: ["$$grade", 2] }
+            }
           }
         }
       ],
       [
         ["items"],
         {
-          $filter: {
-            input: "$items",
-            as: "item",
-            cond: { $gte: ["$$item.price", 100] },
-            limit: 1
+          newField: {
+            $filter: {
+              input: "$items",
+              as: "item",
+              cond: { $gte: ["$$item.price", 100] },
+              limit: 1
+            }
           }
         }
       ],
+      // update expressions
       [
         ["quantity", "details.make", "details.model", "tags"],
         {
@@ -158,9 +167,86 @@ describe("store", () => {
       [
         ["quantity", "metrics.orders"],
         { $inc: { quantity: -2, "metrics.orders": 1 } }
+      ],
+      // projection $slice
+      [["details.colors"], { "details.colors": { $slice: 1 } }],
+      [["comments"], { comments: { $slice: [1, 3] } }],
+      // expression $slice
+      [
+        ["name", "favorites"],
+        { name: 1, threeFavorites: { $slice: ["$favorites", 3] } }
+      ],
+      [
+        ["item", "status", "size.h", "size.w", "size.uom"],
+        {
+          // _id: 0,
+          item: 1,
+          newStatus: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: ["$status", "A"] },
+                  then: "Available"
+                },
+                {
+                  case: { $eq: ["$status", "D"] },
+                  then: "Discontinued"
+                }
+              ],
+              default: "No status found"
+            }
+          },
+          area: {
+            $concat: [
+              { $toString: { $multiply: ["$size.h", "$size.w"] } },
+              " ",
+              "$size.uom"
+            ]
+          },
+          reportNumber: { $literal: 1 }
+        }
       ]
-    ])("should return %p for %j", (expected, input) => {
-      const actual = Array.from(extractKeyPaths(input));
+    ];
+
+    it.each([
+      // root fields excluded. used for projection
+      [["name"], { name: 1 }], // respects projection value
+      [["age"], { name: "$age" }], // respect state variable
+      [[], { name: { $literal: "$age" } }], // ignores literal
+      [[], { name: "John" }],
+      [[], { name: { $eq: "henry" } }], // no longer considered root due to nesting
+      [[], { date: Date.now() }],
+      [
+        ["tag"],
+        { newField: { $and: [{ tags: "$tag" }, { tags: "security" }] } }
+      ],
+      ...commonFixtures
+    ])(
+      "should NOT includeRootFields returning %p for %j",
+      (expected, input) => {
+        const actual = Array.from(
+          getDependentPaths(input, { includeRootFields: false })
+        );
+        actual.sort();
+        expected.sort();
+        expect(actual).toEqual(expected);
+      }
+    );
+
+    it.each([
+      // root fields included.
+      [["name"], { name: "John" }],
+      [["name"], { name: { $eq: "henry" } }], // no longer considered root due to nesting
+      [["date"], { date: Date.now() }],
+      [
+        ["tag", "newField.tags"],
+        { newField: { $and: [{ tags: "$tag" }, { tags: "security" }] } }
+      ],
+      [["tag", "tags"], { $and: [{ tags: "$tag" }, { tags: "security" }] }]
+    ])("should includeRootFields returning %p for %j", (expected, input) => {
+      const actual = Array.from(
+        getDependentPaths(input, { includeRootFields: true })
+      );
       actual.sort();
       expected.sort();
       expect(actual).toEqual(expected);

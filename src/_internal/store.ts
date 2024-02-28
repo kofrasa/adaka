@@ -8,9 +8,9 @@ import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
-import { cloneDeep, isEqual, stringify } from "mingo/util";
+import { cloneDeep, isEqual, normalize, stringify } from "mingo/util";
 
-import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
+import { cloneFrozen, getDependentPaths, sameAncestor } from "./util";
 
 /** Observes a selector for changes in store and optionally return updates to apply. */
 export type Listener<T> = (data: T) => void;
@@ -85,14 +85,29 @@ export class Store<T extends RawObject> {
 
   /**
    * Creates a new observable for a view of the state.
+   *
    * @param projection Fields of the state to view. Expressed as MongoDB projection query.
    * @param condition Conditions to match for a valid state view. Expressed as MongoDB filter query.
    * @returns {Selector}
    */
   select<P extends RawObject>(
-    projection: Record<keyof P, AnyVal> | object,
+    projection: Record<keyof P, AnyVal> | RawObject,
     condition: RawObject = {}
   ): Selector<P> {
+    // disallow exclusions.
+    // for (const v of Object.values(projection)) {
+    //   assert(
+    //     v === 1 ||
+    //       v === true ||
+    //       isObject(v) ||
+    //       isArray(v) ||
+    //       (isString(v) && v.startsWith("$")),
+    //     `selector projection value must be an object, array, true, or 1: '${JSON.stringify(
+    //       projection
+    //     )}'`
+    //   );
+    // }
+
     // ensure not modifiable. some guards for sanity
     condition = cloneFrozen(condition);
     projection = cloneFrozen(projection);
@@ -105,10 +120,21 @@ export class Store<T extends RawObject> {
     }
 
     // get expected paths to monitor for changes. use fields in both projection and condition
-    const [cond, proj] = [condition, projection].map(o =>
-      Array.from(extractKeyPaths(o))
+    const expected = getDependentPaths(
+      Object.entries(condition).reduce((m, [k, v]) => {
+        m[k] = normalize(v);
+        return m;
+      }, {}),
+      { includeRootFields: true }
     );
-    const expected = Array.from(new Set(cond.concat(proj)));
+    getDependentPaths(projection, { includeRootFields: false }).forEach(s =>
+      expected.add(s)
+    );
+
+    // const [cond, proj] = [condition, projection].map(o =>
+    //   Array.from(extractKeyPaths(o))
+    // );
+    // const expected = Array.from(new Set(cond.concat(proj)));
     // create and add a new selector
     const selector = new Selector<P>(
       this.state,
@@ -118,13 +144,13 @@ export class Store<T extends RawObject> {
     );
 
     // if no field is specified, select everything.
-    const pred = !expected.length
+    const pred = !expected.size
       ? () => true
       : (sameAncestor.bind(null, expected) as Predicate<AnyVal>);
     // function to detect changes and notify observers
     const signal = (changed: string[]) => {
-      const isize = new Set(changed.concat(expected)).size; // intersection
-      const usize = expected.length + changed.length; // union
+      const isize = new Set(changed.concat(Array.from(expected))).size; // intersection
+      const usize = expected.size + changed.length; // union
       const notify = isize < usize || changed.some(pred);
       // notify listeners only when change is detected
       if (notify) selector.notifyAll();
@@ -138,7 +164,8 @@ export class Store<T extends RawObject> {
 
   /**
    * Dispatches an update expression to mutate the state. Triggers a notification to relevant selectors only.
-   * @param {RawObject} expr Update expression as a MongoDB update query.
+   *
+   * @param {UpdateExpression} expr Update expression as a MongoDB update query.
    * @param {Array<RawObject>} arrayFilters Array filter expressions to filter elements to update.
    * @param {RawObject} condition Condition to check before applying update.
    * @returns {UpdateResult} Result of the update operation.
@@ -192,7 +219,7 @@ export class Selector<T extends RawObject> {
    */
   constructor(
     private readonly state: RawObject,
-    private readonly projection: Record<keyof T, AnyVal> | object,
+    private readonly projection: Record<keyof T, AnyVal> | RawObject,
     private readonly query: Query,
     private readonly options: QueryOptions
   ) {}
