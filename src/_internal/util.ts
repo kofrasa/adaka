@@ -1,5 +1,5 @@
 import { AnyVal, ArrayOrObject, RawArray, RawObject } from "mingo/types";
-import { getType, isObject, resolve } from "mingo/util";
+import { getType, isObject, isOperator, resolve } from "mingo/util";
 
 const KEYED_OPERATORS_MAP: {
   [k: string]: {
@@ -25,8 +25,9 @@ export function extractKeyPaths(expr: AnyVal, parent?: string): Set<string> {
   switch (getType(expr)) {
     case "String":
       // exclude variables which all begin with "$$"
-      if ((expr as string).startsWith("$$")) return result;
-      else if ((expr as string).startsWith("$")) {
+      if ((expr as string).startsWith("$$")) {
+        return result;
+      } else if ((expr as string).startsWith("$")) {
         result.add((expr as string).substring(1));
       } else if (parent) {
         result.add(parent);
@@ -42,9 +43,10 @@ export function extractKeyPaths(expr: AnyVal, parent?: string): Set<string> {
         // ignore $literal
         if (key === "$literal") continue;
         // handle top-level boolean operators ($and, $or,..) and $expr.
-        if (key.startsWith("$")) {
+        if (isOperator(key)) {
           let val2 = val;
           // handle operators with keyed arguments.
+          // this ensure we process each leaf object correctly and don't treat the leaf itself as a field in our state.
           const opts = KEYED_OPERATORS_MAP[key];
           if (opts && typeof val === "object") {
             val2 = opts.nodes
