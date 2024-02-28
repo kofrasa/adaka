@@ -15,7 +15,7 @@ describe("Store", () => {
   let store: Store<Person>;
   let selector: Selector<Pick<Person, "firstName">>;
   let counter = 0;
-  const subscriber = (_: ReturnType<typeof selector.get>) => {
+  const listener = (_: ReturnType<typeof selector.get>) => {
     counter++;
   };
 
@@ -63,7 +63,7 @@ describe("Store", () => {
   describe("Selector", () => {
     describe("notifyAll", () => {
       it("should notify all subscribers only when the selector value changes", () => {
-        selector.listen(subscriber);
+        selector.subscribe(listener);
         expect(counter).toEqual(0);
 
         selector.notifyAll();
@@ -76,7 +76,7 @@ describe("Store", () => {
 
     describe("removeAll", () => {
       it("should remove all listeners", () => {
-        selector.listen(subscriber);
+        selector.subscribe(listener);
         expect(counter).toEqual(0);
 
         selector.notifyAll();
@@ -88,17 +88,17 @@ describe("Store", () => {
       });
     });
 
-    describe("listen", () => {
+    describe("subscribe", () => {
       it("should fail if subscriber is already registered to listen once", () => {
         // register to listen oncs
-        selector.listenOnce(subscriber);
-        expect(() => selector.listen(subscriber)).toThrowError(
-          /Already subscribed to listen once/
+        selector.subscribe(listener);
+        expect(() => selector.subscribe(listener)).toThrowError(
+          /Listener already subscribed/
         );
       });
 
       it("should not notify when state does not change", () => {
-        selector.listen(subscriber);
+        selector.subscribe(listener);
         expect(counter).toEqual(0);
         // Henry - notify
         expect(store.update({ $set: { firstName: "Henry" } })).toEqual({
@@ -123,7 +123,7 @@ describe("Store", () => {
 
       it("should remove listener on failure", () => {
         let counter2 = 0;
-        selector.listen(_ => {
+        selector.subscribe(_ => {
           counter2++;
           if (counter2 > 1) throw "stop here";
         });
@@ -158,7 +158,7 @@ describe("Store", () => {
           firstName: 1
         });
 
-        const unsub = selector.listen(subscriber);
+        const unsub = selector.subscribe(listener);
         expect(counter).toEqual(0);
 
         expect(store.update({ $set: { firstName: "Kofi" } })).toEqual({
@@ -197,17 +197,43 @@ describe("Store", () => {
       });
     });
 
-    describe("listenOnce", () => {
+    describe("subcribe with runOnce=true", () => {
+      const opts = {
+        runOnce: true
+      };
+
       it("should fail if subscriber is already registered to listen repeatedly", () => {
         // register to listen repeatedly
-        selector.listen(subscriber);
-        expect(() => selector.listenOnce(subscriber)).toThrowError(
-          /Already subscribed to listen repeatedly/
+        selector.subscribe(listener, opts);
+        expect(() => selector.subscribe(listener, opts)).toThrowError(
+          /Listener already subscribed/
         );
       });
 
-      it("should listen once for change and notify", () => {
-        const unsub = selector.listenOnce(subscriber);
+      it("should cleanup on failure", () => {
+        const unsub = selector.subscribe(() => {
+          throw new Error();
+        }, opts);
+
+        expect(store.update({ $set: { firstName: "Amoah" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 1
+        });
+        expect(counter).toEqual(0);
+
+        expect(store.update({ $set: { firstName: "John" } })).toEqual({
+          modified: true,
+          fields: ["firstName"],
+          notifyCount: 0
+        });
+
+        // no-op
+        unsub();
+      });
+
+      it("should subscribe once for change and notify", () => {
+        const unsub = selector.subscribe(listener, opts);
         expect(counter).toEqual(0);
 
         // listen once
@@ -216,6 +242,8 @@ describe("Store", () => {
           fields: ["firstName"],
           notifyCount: 1
         });
+        expect(counter).toEqual(1);
+
         expect(store.update({ $set: { firstName: "Amoah" } })).toEqual({
           modified: false
         });
@@ -247,11 +275,12 @@ describe("Store", () => {
       });
     });
 
-    describe("listenNow", () => {
+    describe("subscribe with runImmediately=true", () => {
+      const opts = { runImmediately: true };
       it("should notify immediately on subscription and then listen repeatedly", () => {
         expect(counter).toEqual(0);
         // notify on subscription
-        selector.listenNow(subscriber);
+        selector.subscribe(listener, opts);
         expect(counter).toEqual(1);
 
         // do not notify. unselected field updated.
@@ -269,9 +298,9 @@ describe("Store", () => {
           { age: { $gt: 25 } }
         );
         let counter = 0;
-        selector.listenNow(_ => {
+        selector.subscribe(_ => {
           counter++;
-        });
+        }, opts);
 
         // notify on subscription.
         expect(counter).toEqual(1);
@@ -291,9 +320,9 @@ describe("Store", () => {
 
       it("should unsubscribe listener and bubble exception on error", () => {
         expect(() =>
-          selector.listenNow(_ => {
+          selector.subscribe(_ => {
             throw new Error("failed immediate invoke");
-          })
+          }, opts)
         ).toThrowError(/failed immediate invoke/);
 
         // subscriber was removed.
@@ -320,7 +349,7 @@ describe("Store", () => {
           { age: { $lt: 25 } }
         );
         let n = 0;
-        selector.listen(_ => {
+        selector.subscribe(_ => {
           n++;
         });
 

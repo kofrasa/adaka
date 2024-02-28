@@ -6,24 +6,35 @@ import {
 } from "mingo/core";
 import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
-import { AnyVal, Callback, Predicate, RawObject } from "mingo/types";
+import { AnyVal, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
 import { cloneDeep, isEqual, stringify } from "mingo/util";
 
 import { cloneFrozen, extractKeyPaths, sameAncestor } from "./util";
 
 /** Observes a selector for changes in store and optionally return updates to apply. */
-export type Listener<T extends RawObject> = Callback<void, T>;
+export type Listener<T> = (data: T) => void;
+
+/** Unsbuscribe from receiving further notifications */
+export type Unsubscribe = () => void;
+
+/** Options to pass on subscription. */
+export interface SubscribeOptions {
+  /** Immediately run the listener when register. Any error will bubble up immediately. */
+  readonly runImmediately?: boolean;
+  /** Run only once. */
+  readonly runOnce?: boolean;
+}
 
 /** Result from update operation which returns useful details. */
-export type UpdateResult = {
+export interface UpdateResult {
   /** Indicates whether the state was modified */
   readonly modified: boolean;
   /** Indicates the fields in the state that were changed if modified. */
   readonly fields?: string[];
   /** Indicates the number of listeners notified. */
   readonly notifyCount?: number;
-};
+}
 
 const NONE = Symbol();
 
@@ -56,7 +67,7 @@ export class Store<T extends RawObject> {
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
     Selector<RawObject>,
-    Callback<boolean, string[]>
+    (s: string[]) => boolean
   >();
   // query options to pass to MongoDB processing engine.
   private readonly queryOptions: QueryOptions;
@@ -143,11 +154,10 @@ export class Store<T extends RawObject> {
     for (const k of this.selectors) {
       const selector = k as Selector<RawObject>;
       const signal = this.signals.get(selector);
-      // take a snapshot of the size before sending the notification.
-      // this accounts for subscribers that may be removed after notification either from running only once or throwing an error.
-      const increment = selector.size;
+      // record the count of listeners befor signalling which may modify the selector if a listener throws or is configured to run once.
+      const size = selector.size;
       if (signal(fields)) {
-        notifyCount += increment;
+        notifyCount += size;
       }
     }
     return { modified: true, fields, notifyCount };
@@ -220,16 +230,17 @@ export class Selector<T extends RawObject> {
     // compute new value.
     const val = this.get();
     if (!isEqual(prev, val)) {
-      for (const cb of this.listeners) {
+      for (const f of this.listeners) {
         /*eslint-disable*/
         try {
-          cb(val);
+          f(val);
         } catch {
-          this.listeners.delete(cb);
+          // on error unsubscribe listener
+          this.listeners.delete(f);
         } finally {
-          if (this.onceOnly.has(cb)) {
-            this.listeners.delete(cb);
-            this.onceOnly.delete(cb);
+          // if runOnce, cleanup afterwards
+          if (this.onceOnly.delete(f)) {
+            this.listeners.delete(f);
           }
         }
         /*eslint-disable-enable*/
@@ -242,65 +253,47 @@ export class Selector<T extends RawObject> {
    */
   removeAll() {
     this.listeners.clear();
-    this.onceOnly.clear();
   }
 
   /**
-   * Register a listener to be notified about state updates.
-   * @param listener The observer function to receive data.
-   * @returns {Callback} Function to unsubscribe listener.
+   * Subscribe a listener to be notified about state updates.
+   *
+   * @param listener The function to receive new data on update.
+   * @returns {Unsubscribe} Function to unsubscribe listener.
    */
-  listen(listener: Listener<T>): Callback<void> {
+  subscribe(listener: Listener<T>, options?: SubscribeOptions): Unsubscribe {
     // check if we are reregistering the same observer
-    if (this.onceOnly.has(listener)) {
-      throw new Error(`Already subscribed to listen once.`);
+    if (this.listeners.has(listener)) {
+      throw new Error("Listener already subscribed.");
     }
-    if (!this.listeners.has(listener)) {
-      this.listeners.add(listener);
-    }
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
 
-  /**
-   * Like listen() but also immediately invoke the listener if a value is pending for selector.
-   * @param listener The observer function to receive data.
-   * @returns {Callback} Function to unsubscribe listener.
-   */
-  listenNow(listener: Listener<T>): Callback<void> {
-    // check if we are reregistering the same observer
-    const unsub = this.listen(listener);
-    // immediately invoke
-    const val = this.get();
-    if (val !== undefined) {
-      try {
-        listener(val);
-      } catch (e) {
-        unsub();
-        throw e;
-      }
-    }
-    return unsub;
-  }
-
-  /**
-   * Like listen(), but invokes the listener only once and then automatically removes it.
-   * @param listener The observer functino to receive data.
-   * @returns {Callback} Function to unsubscribe listener explicitly before it is called.
-   */
-  listenOnce(listener: Listener<T>): Callback<void> {
-    // check if we are reregistering the same observer
-    if (this.listeners.has(listener) && !this.onceOnly.has(listener)) {
-      throw new Error(`Already subscribed to listen repeatedly.`);
-    }
-    if (!this.onceOnly.has(listener)) {
-      this.listeners.add(listener);
+    // setup to throw after first run.
+    if (options && options.runOnce) {
       this.onceOnly.add(listener);
     }
-    return () => {
-      this.listeners.delete(listener);
+
+    this.listeners.add(listener);
+
+    const unsub = () => {
       this.onceOnly.delete(listener);
+      this.listeners.delete(listener);
     };
+
+    if (options && options.runImmediately) {
+      // immediately invoke
+      const val = this.get();
+      if (val !== undefined) {
+        try {
+          listener(val);
+        } catch (e) {
+          unsub();
+          throw e;
+        } finally {
+          if (this.onceOnly.has(listener)) unsub();
+        }
+      }
+    }
+
+    return unsub;
   }
 }
