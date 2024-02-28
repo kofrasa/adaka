@@ -31,6 +31,48 @@ describe("Store", () => {
   });
 
   describe("update", () => {
+    it("should notify subscriber with full state when empty projection specified", () => {
+      const selector = store.select<Person>({});
+      const res: Person[] = [];
+      selector.subscribe(state => res.push({ ...state }));
+      expect(store.update({ $set: { firstName: "John" } })).toEqual({
+        modified: true,
+        fields: ["firstName"],
+        notifyCount: 1
+      });
+      expect(res.pop()).toEqual({
+        firstName: "John",
+        lastName: "Osei",
+        age: 30,
+        children: ["Bediako"]
+      });
+    });
+
+    it("should notify subscriber with full state when empty projection specified and condition holds", () => {
+      const selector = store.select<Person>({}, { age: { $gt: 30 } });
+      const res: Person[] = [];
+      selector.subscribe(state => res.push({ ...state }));
+      expect(store.update({ $set: { firstName: "John" } })).toEqual({
+        modified: true,
+        fields: ["firstName"],
+        notifyCount: 0
+      });
+      expect(res.length).toEqual(0);
+
+      expect(store.update({ $set: { age: 35 } })).toEqual({
+        modified: true,
+        fields: ["age"],
+        notifyCount: 1
+      });
+
+      expect(res.pop()).toEqual({
+        firstName: "John",
+        lastName: "Osei",
+        age: 35,
+        children: ["Bediako"]
+      });
+    });
+
     it("should update store with condition", () => {
       let status = store.update(
         {
@@ -331,6 +373,16 @@ describe("Store", () => {
     });
 
     describe("get", () => {
+      it("should get entire store state with {}", () => {
+        const selector = store.select({});
+        expect(selector.get()).toEqual({
+          firstName: "Kwame",
+          lastName: "Osei",
+          age: 30,
+          children: ["Bediako"]
+        });
+      });
+
       it("should select derived field", () => {
         const selector = store.select<{ fullName: string }>({
           fullName: { $concat: ["$firstName", " ", "$lastName"] }

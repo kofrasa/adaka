@@ -90,7 +90,7 @@ export class Store<T extends RawObject> {
    * @returns {Selector}
    */
   select<P extends RawObject>(
-    projection: Record<keyof P, AnyVal>,
+    projection: Record<keyof P, AnyVal> | object,
     condition: RawObject = {}
   ): Selector<P> {
     // ensure not modifiable. some guards for sanity
@@ -116,7 +116,11 @@ export class Store<T extends RawObject> {
       new Query(condition, this.queryOptions),
       this.queryOptions
     );
-    const pred = sameAncestor.bind(null, expected) as Predicate<AnyVal>;
+
+    // if no field is specified, select everything.
+    const pred = !expected.length
+      ? () => true
+      : (sameAncestor.bind(null, expected) as Predicate<AnyVal>);
     // function to detect changes and notify observers
     const signal = (changed: string[]) => {
       const isize = new Set(changed.concat(expected)).size; // intersection
@@ -188,7 +192,7 @@ export class Selector<T extends RawObject> {
    */
   constructor(
     private readonly state: RawObject,
-    private readonly projection: Record<keyof T, AnyVal>,
+    private readonly projection: Record<keyof T, AnyVal> | object,
     private readonly query: Query,
     private readonly options: QueryOptions
   ) {}
