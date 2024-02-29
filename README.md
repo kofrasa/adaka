@@ -47,7 +47,7 @@ const store = createStore<Person>({
 const selector = store.select<{ name: string }>({ name: 1 });
 
 // subcriber runs whenever name changes.
-const unsubscribe = selector.listen(view => {
+const unsubscribe = selector.subscribe(view => {
   console.log("->", view);
 });
 
@@ -89,7 +89,7 @@ const selector = store.select<{ secondChild: string }>({
   secondChild: "$children.1"
 }, {age: {$lt: 30}});
 
-selector.listen(data => {
+selector.subscribe(data => {
   console.log("->", data);
 });
 
