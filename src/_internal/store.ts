@@ -8,9 +8,14 @@ import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
-import { cloneDeep, isEqual, normalize, stringify } from "mingo/util";
+import { assert, cloneDeep, isEqual, normalize, stringify } from "mingo/util";
 
-import { cloneFrozen, getDependentPaths, sameAncestor } from "./util";
+import {
+  cloneFrozen,
+  getDependentPaths,
+  isProjectExpression,
+  sameAncestor
+} from "./util";
 
 /** Observes a selector for changes in store and optionally return updates to apply. */
 export type Listener<T> = (data: T) => void;
@@ -28,11 +33,11 @@ export interface SubscribeOptions {
 
 /** Result from update operation which returns useful details. */
 export interface UpdateResult {
-  /** Indicates whether the state was modified */
+  /** Represents whether the state was modified */
   readonly modified: boolean;
-  /** Indicates the fields in the state that were changed if modified. */
+  /** The fields in the state object that were modified. */
   readonly fields?: string[];
-  /** Indicates the number of listeners notified. */
+  /** The number of listeners notified. */
   readonly notifyCount?: number;
 }
 
@@ -63,7 +68,7 @@ export class Store<T extends RawObject> {
   private readonly state: T;
   // ordered set of selectors. only selectors with subscribers are kept here.
   private readonly selectors = new Set<Selector<RawObject>>();
-  private readonly hashIndex = new Map<string, Selector<RawObject>>();
+  private readonly cache = new Map<string, Selector<RawObject>>();
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
     Selector<RawObject>,
@@ -95,18 +100,16 @@ export class Store<T extends RawObject> {
     condition: RawObject = {}
   ): Selector<P> {
     // disallow exclusions.
-    // for (const v of Object.values(projection)) {
-    //   assert(
-    //     v === 1 ||
-    //       v === true ||
-    //       isObject(v) ||
-    //       isArray(v) ||
-    //       (isString(v) && v.startsWith("$")),
-    //     `selector projection value must be an object, array, true, or 1: '${JSON.stringify(
-    //       projection
-    //     )}'`
-    //   );
-    // }
+    for (const v of Object.values(projection)) {
+      // validate projection expression immediately catch errors early.
+      assert(v !== 0 && v !== false, "field exclusion not allowed");
+      assert(
+        isProjectExpression(v),
+        `selector projection value must be an object, array, true, or 1: '${JSON.stringify(
+          projection
+        )}'`
+      );
+    }
 
     // ensure not modifiable. some guards for sanity
     condition = cloneFrozen(condition);
@@ -114,12 +117,13 @@ export class Store<T extends RawObject> {
 
     // reuse selectors
     const hash = stringify({ c: condition, p: projection });
-    if (this.hashIndex.has(hash)) {
+    if (this.cache.has(hash)) {
       // anytime we pull selector from cache, we should mark it as dirty.
-      return this.hashIndex.get(hash) as Selector<P>;
+      return this.cache.get(hash) as Selector<P>;
     }
 
-    // get expected paths to monitor for changes. use fields in both projection and condition
+    // get expected paths to monitor for changes.
+    // extract paths in condition expression
     const expected = getDependentPaths(
       Object.entries(condition).reduce((m, [k, v]) => {
         m[k] = normalize(v);
@@ -127,14 +131,11 @@ export class Store<T extends RawObject> {
       }, {}),
       { includeRootFields: true }
     );
+    // extract path in projection expression
     getDependentPaths(projection, { includeRootFields: false }).forEach(s =>
       expected.add(s)
     );
 
-    // const [cond, proj] = [condition, projection].map(o =>
-    //   Array.from(extractKeyPaths(o))
-    // );
-    // const expected = Array.from(new Set(cond.concat(proj)));
     // create and add a new selector
     const selector = new Selector<P>(
       this.state,
@@ -158,7 +159,7 @@ export class Store<T extends RawObject> {
     };
     this.selectors.add(selector);
     this.signals.set(selector as Selector<RawObject>, signal);
-    this.hashIndex.set(hash, selector as Selector<RawObject>);
+    this.cache.set(hash, selector as Selector<RawObject>);
     return selector;
   }
 
@@ -185,7 +186,7 @@ export class Store<T extends RawObject> {
     for (const k of this.selectors) {
       const selector = k as Selector<RawObject>;
       const signal = this.signals.get(selector);
-      // record the count of listeners befor signalling which may modify the selector if a listener throws or is configured to run once.
+      // record the number of listeners before signalling which may remove a listener if it throws or is configured to run once.
       const size = selector.size;
       if (signal(fields)) {
         notifyCount += size;

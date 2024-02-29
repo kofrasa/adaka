@@ -32,13 +32,12 @@ const peekOperator = (o: AnyVal): string | undefined => {
   return keys && keys.length === 1 && isOperator(keys[0]) && keys[0];
 };
 
-// checks that value is not a valid project expression.
-const notProjectExpression = (o: AnyVal) =>
-  o !== 1 &&
-  o !== true &&
-  !isObject(o) &&
-  !isArray(o) &&
-  !(isString(o) && o.startsWith("$"));
+/** checks that value is a valid project expression. */
+export const isProjectExpression = (o: AnyVal) =>
+  o === 1 ||
+  o === true ||
+  !!peekOperator(o) ||
+  (isString(o) && o.startsWith("$"));
 
 export interface GetDependentPathOptions {
   /** Assumes top-level fields are part of the state and includes them.  */
@@ -110,7 +109,7 @@ export function getDependentPaths(
           if (
             !options.includeRootFields &&
             !parent &&
-            notProjectExpression(val)
+            !isProjectExpression(val)
           ) {
             // skip if not a valid project expression or ignoring root fields.
             continue;
