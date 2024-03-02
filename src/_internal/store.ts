@@ -83,9 +83,30 @@ export class Store<T extends RawObject> {
     this.state = cloneDeep(initialState) as T;
     this.queryOptions = initOptions({
       ...options?.queryOptions,
-      useStrictMode: false // force normal JavaScript semantics.
+      // use normal JavaScript semantics.
+      useStrictMode: false
     });
     this.mutate = createUpdater({ cloneMode: "none", ...options });
+  }
+
+  /**
+   * Returns the current state as a frozen object subject to the given criteria.
+   * When no options are specified, returns the full state.
+   *
+   * @param projection An optional projection expression. @default {}
+   * @param condition An optional condition expression.
+   * @returns {T|undefined}
+   */
+  getState<P extends RawObject>(
+    projection: Record<keyof P, AnyVal> | RawObject = {},
+    condition: RawObject = {}
+  ): T | undefined {
+    // project fields and freeze final value if query passes
+    return new Query(condition, this.queryOptions).test(this.state)
+      ? ($project(Lazy([this.state]), projection, this.queryOptions)
+          .map(cloneFrozen)
+          .next().value as T)
+      : undefined;
   }
 
   /**
@@ -231,11 +252,12 @@ export class Selector<T extends RawObject> {
   }
 
   /**
-   * Return the current value from state if the condition is fulfilled.
-   * The returned value is cached for subsequent calls until notifyAll() is called.
+   * Returns the current state view subject to the selector criteria.
+   * The value is only recomputed when the depedent fields in the criteria change.
+   *
    * @returns {T | undefined}
    */
-  get(): T | undefined {
+  getState(): T | undefined {
     // return cached if value has not changed since
     if (this.cached) return this.value;
     // update cached status
@@ -256,11 +278,11 @@ export class Selector<T extends RawObject> {
   notifyAll() {
     // only recompute if there are active listeners.
     if (!this.listeners.size) return;
-    const prev = this.cached ? this.get() : NONE;
+    const prev = this.cached ? this.getState() : NONE;
     // reset the cache when notifyAll() is called.
     this.cached = false;
     // compute new value.
-    const val = this.get();
+    const val = this.getState();
     if (!isEqual(prev, val)) {
       for (const f of this.listeners) {
         /*eslint-disable*/
@@ -313,7 +335,7 @@ export class Selector<T extends RawObject> {
 
     if (options && options.runImmediately) {
       // immediately invoke
-      const val = this.get();
+      const val = this.getState();
       if (val !== undefined) {
         try {
           listener(val);

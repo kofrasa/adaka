@@ -15,7 +15,7 @@ describe("Store", () => {
   let store: Store<Person>;
   let selector: Selector<Pick<Person, "firstName">>;
   let counter = 0;
-  const listener = (_: ReturnType<typeof selector.get>) => {
+  const listener = (_: ReturnType<typeof selector.getState>) => {
     counter++;
   };
 
@@ -28,6 +28,28 @@ describe("Store", () => {
     });
     counter = 0;
     selector = store.select<Pick<Person, "firstName">>({ firstName: 1 });
+  });
+
+  describe("getState", () => {
+    it("should return the entire state", () => {
+      expect(store.getState()).toEqual({
+        firstName: "Kwame",
+        lastName: "Osei",
+        age: 30,
+        children: ["Bediako"]
+      });
+    });
+
+    it("should return a frozen object", () => {
+      const obj = store.getState()!;
+      expect(() => {
+        obj.age = 43;
+      }).toThrow();
+
+      expect(() => {
+        obj.children?.push("Adwoa");
+      }).toThrow();
+    });
   });
 
   describe("update", () => {
@@ -372,22 +394,24 @@ describe("Store", () => {
       });
     });
 
-    describe("get", () => {
-      it("should get entire store state with {}", () => {
-        const selector = store.select({});
-        expect(selector.get()).toEqual({
-          firstName: "Kwame",
-          lastName: "Osei",
-          age: 30,
-          children: ["Bediako"]
-        });
+    describe("getState", () => {
+      it("should return a frozen object", () => {
+        const obj = store
+          .select<{ fullName: string }>({
+            fullName: { $concat: ["$firstName", " ", "$lastName"] }
+          })
+          .getState()!;
+
+        expect(() => {
+          obj.fullName = "Josh";
+        }).toThrow();
       });
 
       it("should select derived field", () => {
         const selector = store.select<{ fullName: string }>({
           fullName: { $concat: ["$firstName", " ", "$lastName"] }
         });
-        expect(selector.get()).toEqual({ fullName: "Kwame Osei" });
+        expect(selector.getState()).toEqual({ fullName: "Kwame Osei" });
       });
 
       it("should select field based on condition", () => {
@@ -406,19 +430,19 @@ describe("Store", () => {
         });
 
         // failed condition
-        expect(selector.get()).toBeUndefined();
+        expect(selector.getState()).toBeUndefined();
 
         store.update({ $set: { age: 20 } });
         // no second child yet.
-        expect(selector.get()).toEqual({});
+        expect(selector.getState()).toEqual({});
         expect(n).toEqual(1); // notified
 
         store.update({ $push: { children: "Adrian" } });
-        expect(selector.get()).toEqual({ secondChild: "Adrian" });
+        expect(selector.getState()).toEqual({ secondChild: "Adrian" });
         expect(n).toEqual(2); // notified
 
         store.update({ $set: { age: 35 } });
-        expect(selector.get()).toBeUndefined();
+        expect(selector.getState()).toBeUndefined();
         expect(n).toEqual(3); // notified
 
         store.update({ $set: { age: 40 } });
