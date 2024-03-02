@@ -17,8 +17,8 @@ High-precision state management using MongoDB query language.
 
 - Manage state as a single document modifiable only through the store API.
 - Update state using MongoDB [update query](https://www.mongodb.com/docs/manual/reference/operator/update/) language.
-- Create selectors to observe a view of the state with full access to query language for reshaping data.
-- Listen for changes in state view in order to react to updates.
+- Use selectors to precisely observe specific data in state and subscribe to be notified only when they change.
+- Subscribers are notified with a frozen immutable object.
 - Restrict state notifications with conditions expressed as queries.
 - Automatically unsubscribes a listener if it throws an exception.
 - Performs value equality using deep equal.
@@ -54,8 +54,8 @@ const unsubscribe = selector.subscribe(view => {
 // first update
 store.update({ $set: { name: "Amoah" } }); //output: '-> {name:"Amoah"}'
 
-// can also use selector.get() to obtain the value directly.
-console.log(selector.get()); // {name: "Amoah"}
+// can also use selector.getState() to obtain the value directly.
+console.log(selector.getState()); // {name: "Amoah"}
 
 // second update
 store.update({ $set: { name: "Donkor" } }); //output: '-> {name:"Donkor"}'
@@ -93,20 +93,20 @@ selector.subscribe(data => {
   console.log("->", data);
 });
 
-selector.get() // undefined
+selector.getState() // undefined
 
 store.update({$set: {age: 25}})
 // no second child yet.
-selector.get() // {}
+selector.getState() // {}
 
 store.update({ $push: { children: "Adrian"} })
-selector.get() // { secondChild: 'Adrian' }. listeners notified.
+selector.getState() // { secondChild: 'Adrian' }. listeners notified.
 
 store.update({ $set: { age: 35 } })
-selector.get() // undefined. listeners notified.
+selector.getState() // undefined. listeners notified.
 
 store.update({ $set: { age: 40 } })
-selector.get() // undefined. no notifications because condition is false.
+selector.getState() // undefined. no notifications because condition is false.
 ```
 
 ### React Integration

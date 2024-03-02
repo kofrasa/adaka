@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.10 / 2024-03-xx
+**New**
+- Add `Store.getState` method to directly query state.
+
+**Changed**
+- Rename `Selector.get` to `Selector.getState`.
+
 ## 0.0.9 / 2024-02-28
 
 **New**
