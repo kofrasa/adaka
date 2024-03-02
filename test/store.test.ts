@@ -136,6 +136,19 @@ describe("Store", () => {
         selector.notifyAll();
         expect(counter).toEqual(1);
       });
+
+      it("should notify subcribers with the same frozen value", () => {
+        const arr: Pick<Person, "firstName">[] = [];
+        selector.subscribe(d => arr.push(d));
+        selector.subscribe(d => arr.push(d));
+
+        selector.notifyAll();
+
+        expect(arr.length).toEqual(2);
+        expect(arr[0]).toEqual({ firstName: "Kwame" });
+        expect(arr[0] === arr[1]).toEqual(true);
+        expect(() => (arr[0].firstName = "John")).toThrow();
+      });
     });
 
     describe("removeAll", () => {
@@ -261,7 +274,7 @@ describe("Store", () => {
       });
     });
 
-    describe("subcribe with runOnce=true", () => {
+    describe("subscribe with runOnce=true", () => {
       const opts = {
         runOnce: true
       };
@@ -395,16 +408,13 @@ describe("Store", () => {
     });
 
     describe("getState", () => {
-      it("should return a frozen object", () => {
-        const obj = store
-          .select<{ fullName: string }>({
-            fullName: { $concat: ["$firstName", " ", "$lastName"] }
-          })
-          .getState()!;
+      it("should return same frozen object on multiple calls if state is unmodified", () => {
+        const a = selector.getState()!;
+        const b = selector.getState()!;
 
-        expect(() => {
-          obj.fullName = "Josh";
-        }).toThrow();
+        expect(a).toEqual({ firstName: "Kwame" });
+        expect(a === b).toEqual(true);
+        expect(() => (a.firstName = "John")).toThrow();
       });
 
       it("should select derived field", () => {

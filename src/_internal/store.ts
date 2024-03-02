@@ -43,6 +43,27 @@ export interface UpdateResult {
 
 const NONE = Symbol();
 
+const EMPTY_QUERY = new Query({});
+
+/** helper to create query object. */
+const mkQuery = (condition: RawObject, options: QueryOptions) =>
+  !Object.keys(condition).length ? EMPTY_QUERY : new Query(condition, options);
+
+/** Run query and project fields from state object. */
+const find = <T>(
+  obj: RawObject,
+  query: Query,
+  projection: RawObject,
+  options: QueryOptions
+) => {
+  // project fields and freeze final value if query passes
+  return query.test(obj)
+    ? ($project(Lazy([obj]), projection, options)
+        .map(cloneFrozen)
+        .next().value as T)
+    : undefined;
+};
+
 /**
  * Creates a new store object.
  *
@@ -94,19 +115,19 @@ export class Store<T extends RawObject> {
    * When no options are specified, returns the full state.
    *
    * @param projection An optional projection expression. @default {}
-   * @param condition An optional condition expression.
+   * @param condition An optional condition expression. @default {}
    * @returns {T|undefined}
    */
   getState<P extends RawObject>(
     projection: Record<keyof P, AnyVal> | RawObject = {},
     condition: RawObject = {}
   ): T | undefined {
-    // project fields and freeze final value if query passes
-    return new Query(condition, this.queryOptions).test(this.state)
-      ? ($project(Lazy([this.state]), projection, this.queryOptions)
-          .map(cloneFrozen)
-          .next().value as T)
-      : undefined;
+    return find(
+      this.state,
+      mkQuery(condition, this.queryOptions),
+      projection,
+      this.queryOptions
+    );
   }
 
   /**
@@ -161,7 +182,7 @@ export class Store<T extends RawObject> {
     const selector = new Selector<P>(
       this.state,
       projection,
-      new Query(condition, this.queryOptions),
+      mkQuery(condition, this.queryOptions),
       this.queryOptions
     );
 
@@ -263,12 +284,12 @@ export class Selector<T extends RawObject> {
     // update cached status
     this.cached = true;
     // project fields and freeze final value if query passes
-    this.value = this.query.test(this.state)
-      ? ($project(Lazy([this.state]), this.projection, this.options)
-          .map(cloneFrozen)
-          .next().value as T)
-      : undefined;
-    return this.value;
+    return (this.value = find(
+      this.state,
+      this.query,
+      this.projection,
+      this.options
+    ));
   }
 
   /**
