@@ -151,20 +151,6 @@ describe("Store", () => {
       });
     });
 
-    describe("removeAll", () => {
-      it("should remove all listeners", () => {
-        selector.subscribe(listener);
-        expect(counter).toEqual(0);
-
-        selector.notifyAll();
-        expect(counter).toEqual(1);
-
-        selector.removeAll();
-        selector.notifyAll();
-        expect(counter).toEqual(1);
-      });
-    });
-
     describe("subscribe", () => {
       it("should fail if subscriber is already registered to listen once", () => {
         // register to listen oncs

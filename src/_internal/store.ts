@@ -71,7 +71,7 @@ const find = <T>(
  * @param updateOptions Options to be used for updates and queries.
  * @returns {Store}
  */
-export function createStore<T extends RawObject>(
+export function createStore<T extends RawObject = RawObject>(
   initialState: T,
   updateOptions?: UpdateOptions
 ): Store<T> {
@@ -84,12 +84,11 @@ export function createStore<T extends RawObject>(
  * A store provides APIs to update and query views of the internal object using the MongoDB query language.
  * A view can be subscribed to for changes by registering listeners which are notified when their values change.
  */
-export class Store<T extends RawObject> {
+export class Store<T extends RawObject = RawObject> {
   // internal reference to state object
   private readonly state: T;
-  // ordered set of selectors. only selectors with subscribers are kept here.
-  private readonly selectors = new Set<Selector<RawObject>>();
-  private readonly cache = new Map<string, Selector<RawObject>>();
+  // ordered set of selectors.
+  private readonly selectors = new Map<string, Selector<RawObject>>();
   // signals for notifying selectors of changes.
   private readonly signals = new Map<
     Selector<RawObject>,
@@ -99,6 +98,10 @@ export class Store<T extends RawObject> {
   private readonly queryOptions: QueryOptions;
   // the updater function
   private readonly mutate: Updater;
+  // flag for checking modifications to the entire state.
+  private modified = true;
+  // previous full state cached for full state retrievals only.
+  private prevState: RawObject;
 
   constructor(initialState: T, options?: UpdateOptions) {
     this.state = cloneDeep(initialState) as T;
@@ -116,18 +119,30 @@ export class Store<T extends RawObject> {
    *
    * @param projection An optional projection expression. @default {}
    * @param condition An optional condition expression. @default {}
-   * @returns {T|undefined}
+   * @returns {RawObject|undefined} The current state.
    */
-  getState<P extends RawObject>(
+  getState<P extends T>(
     projection: Record<keyof P, AnyVal> | RawObject = {},
     condition: RawObject = {}
-  ): T | undefined {
-    return find(
+  ): P | undefined {
+    // cache enabled only for full state.
+    const cacheEnabled = isEqual(projection, {}) && isEqual(condition, {});
+    // return the previous state
+    if (cacheEnabled && !this.modified) return this.prevState as P;
+    // extract value
+    const value = find(
       this.state,
       mkQuery(condition, this.queryOptions),
       projection,
       this.queryOptions
     );
+    // cache if the full object
+    if (cacheEnabled) {
+      this.modified = false;
+      this.prevState = value as P;
+    }
+
+    return value as P;
   }
 
   /**
@@ -157,11 +172,10 @@ export class Store<T extends RawObject> {
     condition = cloneFrozen(condition);
     projection = cloneFrozen(projection);
 
-    // reuse selectors
-    const hash = stringify({ c: condition, p: projection });
-    if (this.cache.has(hash)) {
-      // anytime we pull selector from cache, we should mark it as dirty.
-      return this.cache.get(hash) as Selector<P>;
+    // reuse same selector definitions
+    const hash = stringify([projection, condition]);
+    if (this.selectors.has(hash)) {
+      return this.selectors.get(hash) as Selector<P>;
     }
 
     // get expected paths to monitor for changes.
@@ -199,9 +213,9 @@ export class Store<T extends RawObject> {
       if (notify) selector.notifyAll();
       return notify;
     };
-    this.selectors.add(selector);
+    // this.selectors.add(selector);
     this.signals.set(selector as Selector<RawObject>, signal);
-    this.cache.set(hash, selector as Selector<RawObject>);
+    this.selectors.set(hash, selector as Selector<RawObject>);
     return selector;
   }
 
@@ -223,17 +237,17 @@ export class Store<T extends RawObject> {
     if (!fields.length) {
       return { modified: false };
     }
+    // set modified flag
+    this.modified = true;
     // notify subscribers
     let notifyCount = 0;
-    for (const k of this.selectors) {
-      const selector = k as Selector<RawObject>;
+    this.selectors.forEach(selector => {
       const signal = this.signals.get(selector);
-      // record the number of listeners before signalling which may remove a listener if it throws or is configured to run once.
+      // record the number of listeners before notifying the selector.
+      // upon notification a listener will be removed from the selector if it throws or is configured to run once.
       const size = selector.size;
-      if (signal(fields)) {
-        notifyCount += size;
-      }
-    }
+      if (signal(fields)) notifyCount += size;
+    });
     return { modified: true, fields, notifyCount };
   }
 }
@@ -242,7 +256,7 @@ export class Store<T extends RawObject> {
  * Provides an observable interface for selecting customized views of the state.
  * Listeners can subscribe to be notified of changes in the view repeatedely or once.
  */
-export class Selector<T extends RawObject> {
+export class Selector<T extends RawObject = RawObject> {
   // iteration happens in insertion order.
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
   private readonly listeners = new Set<Listener<T>>();
@@ -304,30 +318,26 @@ export class Selector<T extends RawObject> {
     this.cached = false;
     // compute new value.
     const val = this.getState();
-    if (!isEqual(prev, val)) {
-      for (const f of this.listeners) {
-        /*eslint-disable*/
-        try {
-          f(val);
-        } catch {
-          // on error unsubscribe listener
-          this.listeners.delete(f);
-        } finally {
-          // if runOnce, cleanup afterwards
-          if (this.onceOnly.delete(f)) {
-            this.listeners.delete(f);
-          }
-        }
-        /*eslint-disable-enable*/
-      }
-    }
-  }
+    // No change so skip notifications. If a new subscriber was added after the last notification, it will be skipped here as well.
+    // This is becuase the state has still not changed after it was added. For new subscribers to receive current state on subcsription,
+    // they should be registered with {runImmediately: true}.
+    if (isEqual(prev, val)) return;
 
-  /**
-   * Remove all registered listeners.
-   */
-  removeAll() {
-    this.listeners.clear();
+    for (const f of this.listeners) {
+      /*eslint-disable*/
+      try {
+        f(val);
+      } catch {
+        // on error unsubscribe listener
+        this.listeners.delete(f);
+      } finally {
+        // if runOnce, cleanup afterwards
+        if (this.onceOnly.delete(f)) {
+          this.listeners.delete(f);
+        }
+      }
+      /*eslint-disable-enable*/
+    }
   }
 
   /**

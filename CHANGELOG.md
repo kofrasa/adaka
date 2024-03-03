@@ -3,6 +3,8 @@
 ## 0.0.10 / 2024-03-xx
 **New**
 - Add `Store.getState` method to directly query state.
+- Cache previous full state value for `Store.getState`.
+- Remove `Selector.removeAll`.
 
 **Changed**
 - Rename `Selector.get` to `Selector.getState`.
