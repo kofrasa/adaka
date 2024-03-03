@@ -46,22 +46,11 @@ const NONE = Symbol();
 const EMPTY_QUERY = new Query({});
 
 /** helper to create query object. */
-const mkQuery = (condition: RawObject, options: QueryOptions) =>
-  !Object.keys(condition).length ? EMPTY_QUERY : new Query(condition, options);
-
-/** Run query and project fields from state object. */
-const find = <T>(
-  obj: RawObject,
-  query: Query,
-  projection: RawObject,
-  options: QueryOptions
-) => {
-  // project fields and freeze final value if query passes
-  return query.test(obj)
-    ? ($project(Lazy([obj]), projection, options)
-        .map(cloneFrozen)
-        .next().value as T)
-    : undefined;
+const mkQuery = (condition: RawObject | Query, options: QueryOptions) => {
+  if (condition instanceof Query) return condition;
+  return !Object.keys(condition).length
+    ? EMPTY_QUERY
+    : new Query(condition, options);
 };
 
 /**
@@ -123,19 +112,22 @@ export class Store<T extends RawObject = RawObject> {
    */
   getState<P extends T>(
     projection: Record<keyof P, AnyVal> | RawObject = {},
-    condition: RawObject = {}
+    condition: RawObject | Query = {}
   ): P | undefined {
     // cache enabled only for full state.
-    const cacheEnabled = isEqual(projection, {}) && isEqual(condition, {});
+    const cacheEnabled =
+      isEqual(projection, {}) &&
+      (isEqual(condition, {}) || condition === EMPTY_QUERY);
     // return the previous state
     if (cacheEnabled && !this.modified) return this.prevState as P;
-    // extract value
-    const value = find(
-      this.state,
-      mkQuery(condition, this.queryOptions),
-      projection,
-      this.queryOptions
-    );
+    // project fields and freeze final value if query passes
+    const query = mkQuery(condition, this.queryOptions);
+    const value = query.test(this.state)
+      ? $project(Lazy([this.state]), projection, this.queryOptions)
+          .map(cloneFrozen)
+          .next().value
+      : undefined;
+
     // cache if the full object
     if (cacheEnabled) {
       this.modified = false;
@@ -194,10 +186,9 @@ export class Store<T extends RawObject = RawObject> {
 
     // create and add a new selector
     const selector = new Selector<P>(
-      this.state,
-      projection,
+      this,
       mkQuery(condition, this.queryOptions),
-      this.queryOptions
+      projection
     );
 
     // if no field is specified, select everything.
@@ -269,16 +260,14 @@ export class Selector<T extends RawObject = RawObject> {
 
   /**
    * Construct a new selector
-   * @param state Reference to the state object.
-   * @param projection View of the state to select expressed as MongoDB projection query.
+   * @param store Reference to the store object.
    * @param query Query object for checking conditions based on MongoDB filter query.
-   * @param options Options to use for the query.
+   * @param projection View of the state to select expressed as MongoDB projection query.
    */
   constructor(
-    private readonly state: RawObject,
-    private readonly projection: Record<keyof T, AnyVal> | RawObject,
+    private readonly store: Store,
     private readonly query: Query,
-    private readonly options: QueryOptions
+    private readonly projection: Record<keyof T, AnyVal> | RawObject
   ) {}
 
   /** Returns the number of subscribers to this selector. */
@@ -298,12 +287,7 @@ export class Selector<T extends RawObject = RawObject> {
     // update cached status
     this.cached = true;
     // project fields and freeze final value if query passes
-    return (this.value = find(
-      this.state,
-      this.query,
-      this.projection,
-      this.options
-    ));
+    return (this.value = this.store.getState(this.projection, this.query));
   }
 
   /**
