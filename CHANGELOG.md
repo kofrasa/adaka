@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.10 / 2024-03-xx
+## 0.0.10 / 2024-03-04
 **New**
 - Add `Store.getState` method to directly query state.
 - Cache previous value for full retrieval.
