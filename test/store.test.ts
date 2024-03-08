@@ -1,7 +1,8 @@
 import { OperatorType, useOperators } from "mingo/core";
 import { $concat } from "mingo/operators/expression";
 
-import { createStore, Selector, Store } from "../src";
+import { createStore, Store } from "../src";
+import { Selector } from "../src/_internal/selector";
 
 useOperators(OperatorType.EXPRESSION, { $concat });
 
@@ -54,7 +55,7 @@ describe("Store", () => {
 
   describe("update", () => {
     it("should notify subscriber with full state when empty projection specified", () => {
-      const selector = store.select<Person>({});
+      const selector = store.select({});
       const res: Person[] = [];
       selector.subscribe(state => res.push({ ...state }));
       expect(store.update({ $set: { firstName: "John" } })).toEqual({
