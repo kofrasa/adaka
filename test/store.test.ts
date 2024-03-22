@@ -123,6 +123,33 @@ describe("Store", () => {
         notifyCount: 0
       });
     });
+
+    it("should apply multiple operations in single call", () => {
+      const status = store.update(
+        [
+          {
+            $set: { age: 15 }
+          },
+          {
+            $pop: { children: 1 }
+          }
+        ],
+        []
+      );
+
+      expect(status).toEqual({
+        modified: true,
+        fields: ["age", "children"],
+        notifyCount: 0
+      });
+
+      expect(store.getState()).toEqual({
+        firstName: "Kwame",
+        lastName: "Osei",
+        age: 15,
+        children: []
+      });
+    });
   });
 
   describe("Selector", () => {

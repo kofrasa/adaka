@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.11 / 2024-03-22
+**New**
+- Add support for multiple update operations in single call.
+
+**Fixes**
+- Restore clone mode default to "copy".
+
 ## 0.0.10 / 2024-03-04
 **New**
 - Add `Store.getState` method to directly query state.

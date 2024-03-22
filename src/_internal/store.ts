@@ -94,7 +94,7 @@ export class Store<S extends RawObject = RawObject> {
       // use normal JavaScript semantics.
       useStrictMode: false
     });
-    this.mutate = createUpdater({ cloneMode: "none", ...options });
+    this.mutate = createUpdater(options);
   }
 
   /**
@@ -230,6 +230,9 @@ export class Store<S extends RawObject = RawObject> {
     if (!fields.length) {
       return { modified: false };
     }
+
+    // maintain stability.
+    fields.sort();
     // set modified flag
     this.modified = true;
     // notify subscribers
