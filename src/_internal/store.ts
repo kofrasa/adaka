@@ -8,7 +8,14 @@ import { Lazy } from "mingo/lazy";
 import { $project } from "mingo/operators/pipeline";
 import { AnyVal, Predicate, RawObject } from "mingo/types";
 import { createUpdater, UpdateExpression, Updater } from "mingo/updater";
-import { assert, cloneDeep, isEqual, normalize, stringify } from "mingo/util";
+import {
+  assert,
+  cloneDeep,
+  ensureArray,
+  isEqual,
+  normalize,
+  stringify
+} from "mingo/util";
 
 import { GetStateFn, Selector } from "./selector";
 import {
@@ -23,7 +30,7 @@ export interface UpdateResult {
   /** Represents whether the state was modified */
   readonly modified: boolean;
   /** The fields in the state object that were modified. */
-  readonly fields?: string[];
+  readonly fields?: Readonly<string[]>;
   /** The number of listeners notified. */
   readonly notifyCount?: number;
 }
@@ -37,6 +44,8 @@ const mkQuery = (condition: RawObject | Query, options: QueryOptions) => {
     ? EMPTY_QUERY
     : new Query(condition, options);
 };
+
+type Signal = (s: Readonly<string[]>) => boolean;
 
 /**
  * Creates a new store object.
@@ -62,11 +71,12 @@ export class Store<S extends RawObject = RawObject> {
   // internal reference to state object
   private readonly state: S;
   // ordered set of selectors.
-  private readonly selectors = new Map<string, Selector<RawObject>>();
-  // signals for notifying selectors of changes.
-  private readonly signals = new Map<
-    Selector<RawObject>,
-    (s: string[]) => boolean
+  private readonly selectors = new Map<
+    string,
+    {
+      selector: Selector<RawObject>;
+      signal: Signal;
+    }
   >();
   // query options to pass to MongoDB processing engine.
   private readonly queryOptions: QueryOptions;
@@ -152,7 +162,7 @@ export class Store<S extends RawObject = RawObject> {
     // reuse same selector definitions
     const hash = stringify([projection, condition]);
     if (this.selectors.has(hash)) {
-      return this.selectors.get(hash) as Selector<P>;
+      return this.selectors.get(hash).selector as Selector<P>;
     }
 
     // get expected paths to monitor for changes.
@@ -181,7 +191,7 @@ export class Store<S extends RawObject = RawObject> {
       ? () => true
       : (sameAncestor.bind(null, expected) as Predicate<AnyVal>);
     // function to detect changes and notify observers
-    const signal = (changed: string[]) => {
+    const signal = (changed: Readonly<string[]>) => {
       const isize = new Set(changed.concat(Array.from(expected))).size; // intersection
       const usize = expected.size + changed.length; // union
       const notify = isize < usize || changed.some(pred);
@@ -190,25 +200,32 @@ export class Store<S extends RawObject = RawObject> {
       return notify;
     };
 
-    this.signals.set(selector as Selector<RawObject>, signal);
-    this.selectors.set(hash, selector as Selector<RawObject>);
+    this.selectors.set(hash, { selector, signal });
     return selector;
   }
 
   /**
    * Dispatches an update expression to mutate the state. Triggers a notification to relevant selectors only.
    *
-   * @param {UpdateExpression} expr Update expression as a MongoDB update query.
+   * @param {UpdateExpression | UpdateExpression[]} expr Update expression as a MongoDB update query.
    * @param {Array<RawObject>} arrayFilters Array filter expressions to filter elements to update.
    * @param {RawObject} condition Condition to check before applying update.
    * @returns {UpdateResult} Result of the update operation.
    */
   update(
-    expr: UpdateExpression,
+    expr: UpdateExpression | UpdateExpression[],
     arrayFilters: RawObject[] = [],
     condition: RawObject = {}
   ): UpdateResult {
-    const fields = this.mutate(this.state, expr, arrayFilters, condition);
+    const fields = Array.from(
+      new Set(
+        // apply mutations
+        (ensureArray(expr) as UpdateExpression[]).flatMap(e =>
+          this.mutate(this.state, e, arrayFilters, condition)
+        )
+      )
+    );
+
     // return if state is unchanged
     if (!fields.length) {
       return { modified: false };
@@ -217,13 +234,12 @@ export class Store<S extends RawObject = RawObject> {
     this.modified = true;
     // notify subscribers
     let notifyCount = 0;
-    this.selectors.forEach(selector => {
-      const signal = this.signals.get(selector);
+    for (const { selector, signal } of this.selectors.values()) {
       // record the number of listeners before notifying the selector.
       // upon notification a listener will be removed from the selector if it throws or is configured to run once.
-      const size = selector.size;
-      if (signal(fields)) notifyCount += size;
-    });
+      const size = (selector as Selector).size;
+      if ((signal as Signal)(fields)) notifyCount += size;
+    }
     return { modified: true, fields, notifyCount };
   }
 }
