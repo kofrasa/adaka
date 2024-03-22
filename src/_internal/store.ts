@@ -98,7 +98,7 @@ export class Store<S extends RawObject = RawObject> {
   }
 
   /**
-   * Returns the current state as a frozen object subject to the given criteria.
+   * Returns the current state as a frozen object subject to the given criteria.s
    * When no options are specified, returns the full state.
    *
    * @param projection An optional projection expression. @default {}
@@ -217,11 +217,12 @@ export class Store<S extends RawObject = RawObject> {
     arrayFilters: RawObject[] = [],
     condition: RawObject = {}
   ): UpdateResult {
+    const query = mkQuery(condition, this.queryOptions);
     const fields = Array.from(
       new Set(
         // apply mutations
         (ensureArray(expr) as UpdateExpression[]).flatMap(e =>
-          this.mutate(this.state, e, arrayFilters, condition)
+          this.mutate(this.state, e, arrayFilters, query)
         )
       )
     );
