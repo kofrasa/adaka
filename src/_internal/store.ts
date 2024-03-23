@@ -94,7 +94,11 @@ export class Store<S extends RawObject = RawObject> {
       // use normal JavaScript semantics.
       useStrictMode: false
     });
-    this.mutate = createUpdater(options);
+    this.mutate = createUpdater({
+      cloneMode: "copy",
+      ...options,
+      queryOptions: this.queryOptions
+    });
   }
 
   /**
